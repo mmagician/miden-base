@@ -1,10 +1,12 @@
 use alloc::string::ToString;
+use std::vec::Vec;
 
 use miden_objects::{
     AccountError, Word,
     account::{
         Account, AccountBuilder, AccountComponent, AccountIdAnchor, AccountStorageMode, AccountType,
     },
+    asset::Asset,
 };
 
 use super::AuthScheme;
@@ -77,6 +79,48 @@ pub fn create_basic_wallet(
         .build()?;
 
     Ok((account, account_seed))
+}
+
+/// Creates a new account with basic wallet interface, the specified authentication scheme and the
+/// account storage type. Basic wallets can be specified to have either mutable or immutable code.
+///
+/// The basic wallet interface exposes three procedures:
+/// - `receive_asset`, which can be used to add an asset to the account.
+/// - `create_note`, which can be used to create a new note without any assets attached to it.
+/// - `move_asset_to_note`, which can be used to remove the specified asset from the account and add
+///   it to the output note with the specified index.
+///
+/// All methods require authentication. The authentication procedure is defined by the specified
+/// authentication scheme.
+#[cfg(any(feature = "testing", test))]
+pub fn create_basic_wallet_with_assets(
+    init_seed: [u8; 32],
+    id_anchor: AccountIdAnchor,
+    auth_scheme: AuthScheme,
+    account_type: AccountType,
+    account_storage_mode: AccountStorageMode,
+    assets: Vec<Asset>,
+) -> Result<Account, AccountError> {
+    if matches!(account_type, AccountType::FungibleFaucet | AccountType::NonFungibleFaucet) {
+        return Err(AccountError::AssumptionViolated(
+            "basic wallet accounts cannot have a faucet account type".to_string(),
+        ));
+    }
+
+    let auth_component: RpoFalcon512 = match auth_scheme {
+        AuthScheme::RpoFalcon512 { pub_key } => RpoFalcon512::new(pub_key),
+    };
+
+    let account = AccountBuilder::new(init_seed)
+        .anchor(id_anchor)
+        .account_type(account_type)
+        .storage_mode(account_storage_mode)
+        .with_component(auth_component)
+        .with_component(BasicWallet)
+        .with_assets(assets)
+        .build_existing()?;
+
+    Ok(account)
 }
 
 // TESTS
