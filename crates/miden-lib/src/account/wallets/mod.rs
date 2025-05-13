@@ -81,17 +81,11 @@ pub fn create_basic_wallet(
     Ok((account, account_seed))
 }
 
-/// Creates a new account with basic wallet interface, the specified authentication scheme and the
-/// account storage type. Basic wallets can be specified to have either mutable or immutable code.
+/// Creates an account with basic wallet interface, the specified authentication scheme, the
+/// account storage type and the specified assets. Basic wallets can be specified to have either
+/// mutable or immutable code.
 ///
-/// The basic wallet interface exposes three procedures:
-/// - `receive_asset`, which can be used to add an asset to the account.
-/// - `create_note`, which can be used to create a new note without any assets attached to it.
-/// - `move_asset_to_note`, which can be used to remove the specified asset from the account and add
-///   it to the output note with the specified index.
-///
-/// All methods require authentication. The authentication procedure is defined by the specified
-/// authentication scheme.
+/// The account is created as an existing account, that is, with its nonce set to one.
 #[cfg(any(feature = "testing", test))]
 pub fn create_basic_wallet_with_assets(
     init_seed: [u8; 32],
