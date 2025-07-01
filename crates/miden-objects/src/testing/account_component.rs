@@ -73,14 +73,16 @@ impl From<AccountMockComponent> for AccountComponent {
 // MOCK AUTH COMPONENT
 // ================================================================================================
 
-/// Creates a mock authentication [`AccountComponent`] for testing purposes. It only increments the nonce.
+/// Creates a mock authentication [`AccountComponent`] for testing purposes.
+///
+/// The component defines an `auth__basic` procedure that always increments the nonce by 1.
 pub struct MockAuthComponent {
     library: Library,
 }
 
 impl MockAuthComponent {
     /// Creates a new MockAuthComponent using the provided assembler.
-    pub fn from_assembler(assembler: Assembler) -> Result<Self, AccountError> {
+    pub fn new(assembler: Assembler) -> Result<Self, AccountError> {
         let library = assembler
             .assemble_library([AUTH_CODE])
             .map_err(AccountError::AccountComponentAssemblyError)?;
@@ -100,7 +102,7 @@ impl From<MockAuthComponent> for AccountComponent {
 const AUTH_CODE: &str = "
     use.miden::account
 
-    export.auth
+    export.auth__basic
         push.1 exec.account::incr_nonce
     end
 ";
@@ -108,7 +110,7 @@ const AUTH_CODE: &str = "
 const NOOP_AUTH_CODE: &str = "
     use.miden::account
 
-    export.auth
+    export.auth__noop
         push.0 drop
     end
 ";
@@ -119,10 +121,9 @@ static CONDITIONAL_AUTH_CODE: LazyLock<String> = LazyLock::new(|| {
     format!(
         r#"
         use.miden::account
-
         const.WRONG_ARGS="{}"
 
-        export.auth
+        export.auth__conditional
             # OS => [AUTH_ARGS_KEY]
             # AS => []
 
@@ -147,7 +148,7 @@ static CONDITIONAL_AUTH_CODE: LazyLock<String> = LazyLock::new(|| {
 
             # If [99, 98, 97, 96] is passed as an argument, all good.
             # Otherwise we error out.
-            push.99.98.97.96 debug.stack eqw assert.err=WRONG_ARGS
+            push.99.98.97.96 eqw assert.err=WRONG_ARGS dropw dropw
 
             # Load the `incr_nonce_flag` from the advice stack.
             adv_push.1
@@ -163,12 +164,15 @@ static CONDITIONAL_AUTH_CODE: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
+/// Creates a mock authentication [`AccountComponent`] for testing purposes.
+///
+/// The component defines an `auth__noop` procedure that does nothing (always succeeds).
 pub struct NoopAuthComponent {
     library: Library,
 }
 
 impl NoopAuthComponent {
-    pub fn from_assembler(assembler: Assembler) -> Result<Self, AccountError> {
+    pub fn new(assembler: Assembler) -> Result<Self, AccountError> {
         let library = assembler
             .assemble_library([NOOP_AUTH_CODE])
             .map_err(AccountError::AccountComponentAssemblyError)?;
@@ -184,12 +188,13 @@ impl From<NoopAuthComponent> for AccountComponent {
     }
 }
 
+/// TODO: Add documentation once #1501 is ready.
 pub struct ConditionalAuthComponent {
     library: Library,
 }
 
 impl ConditionalAuthComponent {
-    pub fn from_assembler(assembler: Assembler) -> Result<Self, AccountError> {
+    pub fn new(assembler: Assembler) -> Result<Self, AccountError> {
         let library = assembler
             .assemble_library([CONDITIONAL_AUTH_CODE.as_str()])
             .map_err(AccountError::AccountComponentAssemblyError)?;

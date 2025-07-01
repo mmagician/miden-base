@@ -1,9 +1,9 @@
 // AUTH
 // ================================================================================================
-use miden_crypto::dsa::rpo_falcon512::SecretKey;
 use miden_lib::{account::auth::RpoFalcon512, transaction::TransactionKernel};
 use miden_objects::{
     account::{AccountComponent, AuthSecretKey},
+    crypto::dsa::rpo_falcon512::SecretKey,
     testing::account_component::{ConditionalAuthComponent, MockAuthComponent, NoopAuthComponent},
 };
 use miden_tx::auth::BasicAuthenticator;
@@ -23,15 +23,14 @@ pub enum Auth {
     /// Creates a mock authentication mechanism for the account that does nothing.
     Noop,
 
-    /// Creates a mock authentication mechanism for the account that does nothing if state hasn't
-    /// changed, and increments the nonce otherwise.
+    /// TODO update once #1501 is ready.
     Conditional,
 }
 
 impl Auth {
     /// Converts `self` into its corresponding authentication [`AccountComponent`] and an optional
-    /// [`BasicAuthenticator`]. The component is always returned, but the authenticator is `None`
-    /// when [`Auth::Mock`] is passed.
+    /// [`BasicAuthenticator`]. The component is always returned, but the authenticator is only
+    /// `Some` when [`Auth::BasicAuth`] is passed."
     pub fn build_component(&self) -> (AccountComponent, Option<BasicAuthenticator<ChaCha20Rng>>) {
         match self {
             Auth::BasicAuth => {
@@ -48,21 +47,28 @@ impl Auth {
                 (component, Some(authenticator))
             },
             Auth::Mock => {
-                let assembler = TransactionKernel::testing_assembler();
-                let component = MockAuthComponent::from_assembler(assembler).unwrap();
+                let assembler = TransactionKernel::assembler();
+                let component = MockAuthComponent::new(assembler).unwrap();
                 (component.into(), None)
             },
 
             Auth::Noop => {
-                let assembler = TransactionKernel::testing_assembler();
-                let component = NoopAuthComponent::from_assembler(assembler).unwrap();
+                let assembler = TransactionKernel::assembler();
+                let component = NoopAuthComponent::new(assembler).unwrap();
                 (component.into(), None)
             },
             Auth::Conditional => {
-                let assembler = TransactionKernel::testing_assembler();
-                let component = ConditionalAuthComponent::from_assembler(assembler).unwrap();
+                let assembler = TransactionKernel::assembler();
+                let component = ConditionalAuthComponent::new(assembler).unwrap();
                 (component.into(), None)
             },
         }
+    }
+}
+
+impl From<Auth> for AccountComponent {
+    fn from(auth: Auth) -> Self {
+        let (component, _) = auth.build_component();
+        component
     }
 }

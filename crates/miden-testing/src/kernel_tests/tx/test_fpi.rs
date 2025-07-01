@@ -19,7 +19,7 @@ use miden_objects::{
     FieldElement,
     account::{
         Account, AccountBuilder, AccountComponent, AccountProcedureInfo, AccountStorage,
-        PartialAccount, StorageSlot,
+        AccountStorageMode, PartialAccount, StorageSlot,
     },
     testing::{account_component::AccountMockComponent, storage::STORAGE_LEAVES_2},
     transaction::{AccountInputs, TransactionScript},
@@ -75,15 +75,14 @@ fn test_fpi_memory() {
     .unwrap()
     .with_supports_all_types();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(foreign_account_component)
         .build_existing()
         .unwrap();
 
     let native_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(
                 TransactionKernel::testing_assembler(),
@@ -91,6 +90,7 @@ fn test_fpi_memory() {
             )
             .unwrap(),
         )
+        .storage_mode(AccountStorageMode::Public)
         .build_existing()
         .unwrap();
 
@@ -336,25 +336,25 @@ fn test_fpi_memory_two_accounts() {
     .unwrap()
     .with_supports_all_types();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let foreign_account_1 = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(foreign_account_component_1)
         .build_existing()
         .unwrap();
 
     let foreign_account_2 = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(foreign_account_component_2)
         .build_existing()
         .unwrap();
 
     let native_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_empty_slots(TransactionKernel::testing_assembler())
                 .unwrap(),
         )
+        .storage_mode(AccountStorageMode::Public)
         .build_existing()
         .unwrap();
 
@@ -541,19 +541,19 @@ fn test_fpi_execute_foreign_procedure() {
     .unwrap()
     .with_supports_all_types();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(foreign_account_component)
         .build_existing()
         .unwrap();
 
     let native_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(TransactionKernel::testing_assembler(), vec![])
                 .unwrap(),
         )
+        .storage_mode(AccountStorageMode::Public)
         .build_existing()
         .unwrap();
 
@@ -628,7 +628,7 @@ fn test_fpi_execute_foreign_procedure() {
     );
 
     let tx_script =
-        TransactionScript::compile(code, vec![], TransactionKernel::testing_assembler()).unwrap();
+        TransactionScript::compile(code, TransactionKernel::testing_assembler()).unwrap();
 
     let foreign_account_inputs = mock_chain.get_foreign_account_inputs(foreign_account.id());
     let tx_context = mock_chain
@@ -702,9 +702,8 @@ fn test_nested_fpi_cyclic_invocation() {
     .unwrap()
     .with_supports_all_types();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let second_foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(second_foreign_account_component)
         .build_existing()
         .unwrap();
@@ -764,18 +763,19 @@ fn test_nested_fpi_cyclic_invocation() {
     .with_supports_all_types();
 
     let first_foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(first_foreign_account_component)
         .build_existing()
         .unwrap();
 
     // ------ NATIVE ACCOUNT ---------------------------------------------------------------
     let native_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(TransactionKernel::testing_assembler(), vec![])
                 .unwrap(),
         )
+        .storage_mode(AccountStorageMode::Public)
         .build_existing()
         .unwrap();
 
@@ -844,7 +844,6 @@ fn test_nested_fpi_cyclic_invocation() {
 
     let tx_script = TransactionScript::compile(
         code,
-        vec![],
         TransactionKernel::testing_assembler().with_debug_mode(true),
     )
     .unwrap();
@@ -852,7 +851,7 @@ fn test_nested_fpi_cyclic_invocation() {
     let tx_context = mock_chain
         .build_tx_context(native_account.id(), &[], &[])
         .foreign_accounts(foreign_account_inputs)
-        .advice_inputs(advice_inputs)
+        .extend_advice_inputs(advice_inputs)
         .tx_script(tx_script)
         .build();
 
@@ -901,9 +900,8 @@ fn test_nested_fpi_stack_overflow() {
             .unwrap()
             .with_supports_all_types();
 
-            let (auth_component, _) = Auth::Mock.build_component();
             let last_foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-                .with_auth_component(auth_component.clone())
+                .with_auth_component(Auth::Mock)
                 .with_component(last_foreign_account_component)
                 .build_existing()
                 .unwrap();
@@ -950,7 +948,7 @@ fn test_nested_fpi_stack_overflow() {
                 .with_supports_all_types();
 
                 let foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-                    .with_auth_component(auth_component.clone())
+                    .with_auth_component(Auth::Mock)
                     .with_component(foreign_account_component)
                     .build_existing()
                     .unwrap();
@@ -960,7 +958,7 @@ fn test_nested_fpi_stack_overflow() {
 
             // ------ NATIVE ACCOUNT ---------------------------------------------------------------
             let native_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-                .with_auth_component(auth_component)
+                .with_auth_component(Auth::Mock)
                 .with_component(
                     AccountMockComponent::new_with_slots(
                         TransactionKernel::testing_assembler(),
@@ -968,6 +966,7 @@ fn test_nested_fpi_stack_overflow() {
                     )
                     .unwrap(),
                 )
+                .storage_mode(AccountStorageMode::Public)
                 .build_existing()
                 .unwrap();
 
@@ -1014,7 +1013,6 @@ fn test_nested_fpi_stack_overflow() {
 
             let tx_script = TransactionScript::compile(
                 code,
-                vec![],
                 TransactionKernel::testing_assembler().with_debug_mode(true),
             )
             .unwrap();
@@ -1075,20 +1073,20 @@ fn test_nested_fpi_native_account_invocation() {
     .unwrap()
     .with_supports_all_types();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let foreign_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(foreign_account_component)
         .build_existing()
         .unwrap();
 
     // ------ NATIVE ACCOUNT ---------------------------------------------------------------
     let native_account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(TransactionKernel::testing_assembler(), vec![])
                 .unwrap(),
         )
+        .storage_mode(AccountStorageMode::Public)
         .build_existing()
         .unwrap();
 
@@ -1135,7 +1133,6 @@ fn test_nested_fpi_native_account_invocation() {
 
     let tx_script = TransactionScript::compile(
         code,
-        vec![],
         TransactionKernel::testing_assembler().with_debug_mode(true),
     )
     .unwrap();
@@ -1143,7 +1140,7 @@ fn test_nested_fpi_native_account_invocation() {
     let tx_context = mock_chain
         .build_tx_context(native_account.id(), &[], &[])
         .foreign_accounts(vec![foreign_account_inputs])
-        .advice_inputs(advice_inputs)
+        .extend_advice_inputs(advice_inputs)
         .tx_script(tx_script)
         .build();
 
@@ -1179,15 +1176,14 @@ fn test_fpi_stale_account() {
     .unwrap()
     .with_supports_all_types();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let mut foreign_account = AccountBuilder::new([5; 32])
-        .with_auth_component(auth_component.clone())
+        .with_auth_component(Auth::Mock)
         .with_component(foreign_account_component)
         .build_existing()
         .unwrap();
 
     let native_account = AccountBuilder::new([4; 32])
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(
                 TransactionKernel::testing_assembler(),
@@ -1234,7 +1230,7 @@ fn test_fpi_stale_account() {
     // original unmodified foreign account. This should result in the foreign account's proof to be
     // invalid for this account tree root.
     let tx_context = mock_chain
-        .build_tx_context(native_account.id(), &[], &[])
+        .build_tx_context(native_account, &[], &[])
         .foreign_accounts(vec![overridden_foreign_account_inputs])
         .build();
 

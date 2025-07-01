@@ -1,4 +1,5 @@
 use.kernel::account
+use.kernel::account_delta
 use.kernel::asset_vault
 use.kernel::constants
 use.kernel::memory
@@ -15,8 +16,6 @@ const.ERR_ACCOUNT_NONCE_DID_NOT_INCREASE_AFTER_STATE_CHANGE="account nonce did n
 const.ERR_EPILOGUE_TOTAL_NUMBER_OF_ASSETS_MUST_STAY_THE_SAME="total number of assets in the account and all involved notes must stay the same"
 
 const.ERR_EPILOGUE_EXECUTED_TRANSACTION_IS_EMPTY="executed transaction neither changed the account state, nor consumed any notes"
-
-const.ERR_EPILOGUE_AUTH_PROCEDURE_FAILED="account authentication procedure failed"
 
 # OUTPUT NOTES PROCEDURES
 # =================================================================================================
@@ -237,9 +236,10 @@ end
 #! Inputs:  []
 #! Outputs: []
 proc.execute_auth_procedure
-    # auth procedure is at index 0 within the account procedures section so no offseting is needed.
+    padw padw padw push.0.0.0
+    # auth procedure is at index 0 within the account procedures section so no offsetting is needed.
     exec.memory::get_acct_procedures_section_ptr
-    # => [auth_procedure_ptr]
+    # => [auth_procedure_ptr, pad(15)]
 
     # get the auth procedure arguments key
     exec.memory::get_auth_procedure_args_key movup.4
@@ -344,6 +344,17 @@ export.finalize_transaction
     swapw dropw
     # => [FINAL_ACCOUNT_COMMITMENT]
 
+    exec.account_delta::compute_commitment
+    # => [ACCOUNT_DELTA_COMMITMENT, FINAL_ACCOUNT_COMMITMENT]
+
+    # insert into advice map ACCOUNT_UPDATE_COMMITMENT: (FINAL_ACCOUNT_COMMITMENT, ACCOUNT_DELTA_COMMITMENT),
+    # where ACCOUNT_UPDATE_COMMITMENT = hash(FINAL_ACCOUNT_COMMITMENT || ACCOUNT_DELTA_COMMITMENT)
+    adv.insert_hdword
+    # => [ACCOUNT_DELTA_COMMITMENT, FINAL_ACCOUNT_COMMITMENT]
+
+    dropw
+    # => [FINAL_ACCOUNT_COMMITMENT]
+
     # build the output vault
     exec.build_output_vault
     # => [FINAL_ACCOUNT_COMMITMENT]
@@ -362,5 +373,5 @@ export.finalize_transaction
     # => [OUTPUT_NOTES_COMMITMENT, FINAL_ACCOUNT_COMMITMENT]
 
     exec.memory::get_expiration_block_num movdn.8
-    # => [OUTPUT_NOTES_COMMITMENT, FINAL_ACCOUNT_HASH, tx_expiration_block_num]
+    # => [OUTPUT_NOTES_COMMITMENT, FINAL_ACCOUNT_COMMITMENT, tx_expiration_block_num]
 end

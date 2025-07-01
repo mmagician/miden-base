@@ -5,9 +5,7 @@ use miden_objects::{
     account::{AccountHeader, AccountId, PartialAccount},
     block::AccountWitness,
     crypto::merkle::InnerNodeInfo,
-    transaction::{
-        InputNote, PartialBlockchain, TransactionArgs, TransactionInputs,
-    },
+    transaction::{InputNote, PartialBlockchain, TransactionArgs, TransactionInputs},
     vm::AdviceInputs,
 };
 
@@ -117,7 +115,6 @@ impl TransactionAdviceInputs {
         tx_args: &TransactionArgs,
         kernel_version: u8,
     ) {
-        let tx_script = tx_args.tx_script();
         let header = tx_inputs.block_header();
 
         // --- block header data (keep in sync with kernel's process_block_data) --
@@ -153,12 +150,10 @@ impl TransactionAdviceInputs {
 
         // --- number of notes, script root and args key ----------------------
         self.extend_stack([Felt::from(tx_inputs.input_notes().num_notes())]);
-        self.extend_stack(tx_script.map_or(Word::default(), |s| *s.root()));
-        self.extend_stack(
-            tx_script.map_or(Word::default(), |script| *script.args_key().unwrap_or_default()),
-        );
+        self.extend_stack(tx_args.tx_script().map_or(Word::default(), |script| *script.root()));
+        self.extend_stack(tx_args.tx_script_arg());
         // --- auth procedure args key -------------------------------------------
-        self.extend_stack(tx_args.auth_procedure_args_key().map_or(Word::default(), |key| *key));
+        self.extend_stack(tx_args.auth_argument());
     }
 
     // BLOCKCHAIN INJECTIONS

@@ -28,6 +28,7 @@ use crate::{
 ///
 /// The methods that are required to be called are:
 ///
+/// - [`AccountBuilder::with_auth_component`],
 /// - [`AccountBuilder::with_component`], which must be called at least once.
 ///
 /// Under the `testing` feature, it is possible to:
@@ -94,24 +95,19 @@ impl AccountBuilder {
 
     /// Adds a designated authentication [`AccountComponent`] to the builder.
     ///
-    /// This component will be placed at index 0 of the account procedures list.
+    /// This component may contain multiple procedures, but is expected to contain exactly one
+    /// authentication procedure (named `auth__*`).
+    /// Calling this method multiple times will override the previous auth component.
+    ///
+    /// Procedures from this component will be placed at the beginning of the account procedure
+    /// list.
     pub fn with_auth_component(mut self, account_component: impl Into<AccountComponent>) -> Self {
-        let component = account_component.into();
-
-        // Validate that the component has exactly one procedure
-        let procedure_count = component
-            .library()
-            .module_infos()
-            .map(|module| module.procedures().count())
-            .sum::<usize>();
-        assert_eq!(procedure_count, 1, "Auth component must have exactly one procedure");
-
-        self.auth_component = Some(component);
+        self.auth_component = Some(account_component.into());
         self
     }
 
     /// Builds the common parts of testing and non-testing code.
-    fn build_inner(&self) -> Result<(AssetVault, AccountCode, AccountStorage), AccountError> {
+    fn build_inner(&mut self) -> Result<(AssetVault, AccountCode, AccountStorage), AccountError> {
         #[cfg(any(feature = "testing", test))]
         let vault = AssetVault::new(&self.assets).map_err(|err| {
             AccountError::BuildError(format!("asset vault failed to build: {err}"), None)
@@ -122,12 +118,11 @@ impl AccountBuilder {
 
         let auth_component = self
             .auth_component
-            .clone()
+            .take()
             .ok_or(AccountError::BuildError("auth component must be set".into(), None))?;
 
-        // Make sure the auth component is first.
         let mut components = vec![auth_component];
-        components.extend_from_slice(&self.components);
+        components.extend(core::mem::take(&mut self.components));
 
         let (code, storage) = Account::initialize_from_components(self.account_type, &components)
             .map_err(|err| {
@@ -173,11 +168,13 @@ impl AccountBuilder {
     /// - The number of procedures in all merged components is 0 or exceeds
     ///   [`AccountCode::MAX_NUM_PROCEDURES`](crate::account::AccountCode::MAX_NUM_PROCEDURES).
     /// - Two or more libraries export a procedure with the same MAST root.
+    /// - Authentication component is missing.
+    /// - Multiple authentication procedures are found.
     /// - The number of [`StorageSlot`](crate::account::StorageSlot)s of all components exceeds 255.
     /// - [`MastForest::merge`](vm_processor::MastForest::merge) fails on the given components.
     /// - If duplicate assets were added to the builder (only under the `testing` feature).
     /// - If the vault is not empty on new accounts (only under the `testing` feature).
-    pub fn build(self) -> Result<(Account, Word), AccountError> {
+    pub fn build(mut self) -> Result<(Account, Word), AccountError> {
         let (vault, code, storage) = self.build_inner()?;
 
         #[cfg(any(feature = "testing", test))]
@@ -228,7 +225,7 @@ impl AccountBuilder {
     /// The [`AccountId`] is constructed by slightly modifying `init_seed[0..8]` to be a valid ID.
     ///
     /// For possible errors, see the documentation of [`Self::build`].
-    pub fn build_existing(self) -> Result<Account, AccountError> {
+    pub fn build_existing(mut self) -> Result<Account, AccountError> {
         let (vault, code, storage) = self.build_inner()?;
 
         let account_id = {
@@ -258,7 +255,7 @@ mod tests {
     use vm_core::FieldElement;
 
     use super::*;
-    use crate::account::StorageSlot;
+    use crate::{account::StorageSlot, testing::account_component::NoopAuthComponent};
 
     const CUSTOM_CODE1: &str = "
           export.foo
@@ -270,11 +267,6 @@ mod tests {
               push.4.4 add eq.8
             end
           ";
-    const AUTH_CODE: &str = "
-            export.auth
-              push.1 assert
-            end
-          ";
 
     static CUSTOM_LIBRARY1: LazyLock<Library> = LazyLock::new(|| {
         Assembler::default()
@@ -284,11 +276,6 @@ mod tests {
     static CUSTOM_LIBRARY2: LazyLock<Library> = LazyLock::new(|| {
         Assembler::default()
             .assemble_library([CUSTOM_CODE2])
-            .expect("code should be valid")
-    });
-    static AUTH_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
-        Assembler::default()
-            .assemble_library([AUTH_CODE])
             .expect("code should be valid")
     });
 
@@ -326,15 +313,6 @@ mod tests {
         }
     }
 
-    struct AuthComponent;
-    impl From<AuthComponent> for AccountComponent {
-        fn from(_auth: AuthComponent) -> Self {
-            AccountComponent::new(AUTH_LIBRARY.clone(), vec![])
-                .expect("component should be valid")
-                .with_supports_all_types()
-        }
-    }
-
     #[test]
     fn account_builder() {
         let storage_slot0 = 25;
@@ -342,7 +320,7 @@ mod tests {
         let storage_slot2 = 42;
 
         let (account, seed) = Account::builder([5; 32])
-            .with_auth_component(AuthComponent)
+            .with_auth_component(NoopAuthComponent::new(Assembler::default()).unwrap())
             .with_component(CustomComponent1 { slot0: storage_slot0 })
             .with_component(CustomComponent2 {
                 slot0: storage_slot1,
@@ -410,7 +388,7 @@ mod tests {
         let storage_slot0 = 25;
 
         let build_error = Account::builder([0xff; 32])
-            .with_auth_component(AuthComponent)
+            .with_auth_component(NoopAuthComponent::new(Assembler::default()).unwrap())
             .with_component(CustomComponent1 { slot0: storage_slot0 })
             .with_assets(AssetVault::mock().assets())
             .build()

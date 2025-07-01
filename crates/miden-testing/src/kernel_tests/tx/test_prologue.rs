@@ -77,7 +77,7 @@ fn test_transaction_prologue() {
         .assemble_program(mock_tx_script_code)
         .unwrap();
 
-    let tx_script = TransactionScript::new(mock_tx_script_program, vec![]);
+    let tx_script = TransactionScript::new(mock_tx_script_program);
 
     let note_args = [
         [Felt::new(91), Felt::new(91), Felt::new(91), Felt::new(91)],
@@ -90,12 +90,11 @@ fn test_transaction_prologue() {
     ]);
 
     let tx_args = TransactionArgs::new(
-        Some(tx_script),
-        Some(note_args_map),
         tx_context.tx_args().advice_inputs().clone().map,
         Vec::<AccountInputs>::new(),
-        None,
-    );
+    )
+    .with_tx_script(tx_script)
+    .with_note_args(note_args_map);
 
     tx_context.set_tx_args(tx_args);
     let process = &tx_context.execute_code(code).unwrap();
@@ -494,11 +493,10 @@ pub fn create_multiple_accounts_test(
         AccountType::FungibleFaucet,
         AccountType::NonFungibleFaucet,
     ] {
-        let (auth_component, _) = Auth::Mock.build_component();
         let (account, seed) = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
             .account_type(account_type)
             .storage_mode(storage_mode)
-            .with_auth_component(auth_component)
+            .with_auth_component(Auth::Mock)
             .with_component(
                 AccountMockComponent::new_with_slots(
                     TransactionKernel::testing_assembler(),
@@ -515,8 +513,7 @@ pub fn create_multiple_accounts_test(
     for (account, seed) in accounts {
         let account_type = account.account_type();
         create_account_test(mock_chain, account, seed).context(format!(
-            "create_multiple_accounts_test test failed for account type {:?}",
-            account_type
+            "create_multiple_accounts_test test failed for account type {account_type}"
         ))?;
     }
 
@@ -617,11 +614,9 @@ pub fn create_account_invalid_seed() {
     let mut mock_chain = MockChain::new();
     mock_chain.prove_next_block();
 
-    let (auth_component, _) = Auth::Mock.build_component();
-
     let (account, seed) = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
         .account_type(AccountType::RegularAccountUpdatableCode)
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -636,7 +631,7 @@ pub fn create_account_invalid_seed() {
     let tx_context = TransactionContextBuilder::new(account)
         .account_seed(Some(seed))
         .tx_inputs(tx_inputs)
-        .advice_inputs(adv_inputs)
+        .extend_advice_inputs(adv_inputs)
         .build();
 
     let code = "

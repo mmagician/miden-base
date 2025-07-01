@@ -1,7 +1,7 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 
 use assembly::{Assembler, Compile, Library};
-use vm_processor::MastForest;
+use vm_processor::{Digest, MastForest};
 
 mod template;
 pub use template::*;
@@ -144,6 +144,39 @@ impl AccountComponent {
     /// Returns `true` if this component supports the given `account_type`, `false` otherwise.
     pub fn supports_type(&self, account_type: AccountType) -> bool {
         self.supported_types.contains(&account_type)
+    }
+
+    /// Returns a vector of tuples (digest, is_auth) for all procedures in this component.
+    pub fn procedures(&self) -> Vec<(Digest, bool)> {
+        let mut procedures = Vec::new();
+        for module in self.library.module_infos() {
+            for (_, procedure_info) in module.procedures() {
+                let is_auth = procedure_info.name.contains("auth__");
+                procedures.push((procedure_info.digest, is_auth));
+            }
+        }
+        procedures
+    }
+
+    /// Returns the index of the auth procedure in the procedures list of this component, if one
+    /// exists. If there are no auth procedures, returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// - If multiple auth procedures are found.
+    pub(super) fn get_auth_procedure_index(&self) -> Result<Option<usize>, AccountError> {
+        let mut auth_procedure_index = None;
+
+        for (index, (_, is_auth)) in self.procedures().iter().enumerate() {
+            if *is_auth {
+                if auth_procedure_index.is_some() {
+                    return Err(AccountError::AccountComponentMultipleAuthProcedures);
+                }
+                auth_procedure_index = Some(index);
+            }
+        }
+
+        Ok(auth_procedure_index)
     }
 
     // MUTATORS

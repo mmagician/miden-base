@@ -1,5 +1,4 @@
 use anyhow::Context;
-use assembly::diagnostics::{IntoDiagnostic, WrapErr, miette};
 use miden_lib::{
     errors::tx_kernel_errors::{
         ERR_ACCOUNT_ID_SUFFIX_LEAST_SIGNIFICANT_BYTE_MUST_BE_ZERO,
@@ -15,7 +14,10 @@ use miden_objects::{
         Account, AccountBuilder, AccountCode, AccountComponent, AccountId, AccountIdVersion,
         AccountProcedureInfo, AccountStorage, AccountStorageMode, AccountType, StorageSlot,
     },
-    assembly::{Library, diagnostics::Report},
+    assembly::{
+        Library,
+        diagnostics::{IntoDiagnostic, Report, WrapErr, miette},
+    },
     asset::AssetVault,
     testing::{
         account_component::AccountMockComponent,
@@ -93,13 +95,12 @@ pub fn test_account_type() -> miette::Result<()> {
 
             let code = format!(
                 "
-                use.kernel::account
+                use.kernel::account_id
 
                 begin
-                    exec.account::{}
+                    exec.account_id::{procedure}
                 end
-                ",
-                procedure
+                "
             );
 
             let process = CodeExecutor::with_advice_provider(MemAdviceProvider::default())
@@ -121,7 +122,7 @@ pub fn test_account_type() -> miette::Result<()> {
             );
         }
 
-        assert!(has_type, "missing test for type {:?}", expected_type);
+        assert!(has_type, "missing test for type {expected_type:?}");
     }
 
     Ok(())
@@ -163,10 +164,10 @@ pub fn test_account_validate_id() -> miette::Result<()> {
         let suffix = Felt::try_from((account_id % (1u128 << 64)) as u64).unwrap();
 
         let code = "
-            use.kernel::account
+            use.kernel::account_id
 
             begin
-                exec.account::validate_id
+                exec.account_id::validate
             end
             ";
 
@@ -215,11 +216,11 @@ fn test_is_faucet_procedure() -> miette::Result<()> {
 
         let code = format!(
             "
-            use.kernel::account
+            use.kernel::account_id
 
             begin
                 push.{prefix}
-                exec.account::is_faucet
+                exec.account_id::is_faucet
                 # => [is_faucet, account_id_prefix]
 
                 # truncate the stack
@@ -237,8 +238,7 @@ fn test_is_faucet_procedure() -> miette::Result<()> {
         assert_eq!(
             process.stack.get(0),
             Felt::new(is_faucet as u64),
-            "Rust and Masm is_faucet diverged. account_id: {}",
-            account_id
+            "Rust and MASM is_faucet diverged for account_id {account_id}"
         );
     }
 
@@ -282,9 +282,8 @@ fn test_get_item() -> miette::Result<()> {
 
 #[test]
 fn test_get_map_item() -> miette::Result<()> {
-    let (auth_component, _) = Auth::Mock.build_component();
     let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(
                 TransactionKernel::assembler(),
@@ -455,9 +454,8 @@ fn test_set_map_item() -> miette::Result<()> {
         [Felt::new(9_u64), Felt::new(10_u64), Felt::new(11_u64), Felt::new(12_u64)],
     );
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(
             AccountMockComponent::new_with_slots(
                 TransactionKernel::assembler(),
@@ -612,9 +610,8 @@ fn test_account_component_storage_offset() -> miette::Result<()> {
     .unwrap()
     .with_supported_type(AccountType::RegularAccountUpdatableCode);
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let mut account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth_component)
+        .with_auth_component(Auth::Mock)
         .with_component(component1)
         .with_component(component2)
         .build_existing()
@@ -654,7 +651,7 @@ fn test_account_component_storage_offset() -> miette::Result<()> {
     "
     );
     let tx_script_program = assembler.assemble_program(tx_script_source_code).unwrap();
-    let tx_script = TransactionScript::new(tx_script_program, vec![]);
+    let tx_script = TransactionScript::new(tx_script_program);
 
     // setup transaction context
     let tx_context = TransactionContextBuilder::new(account.clone()).tx_script(tx_script).build();
@@ -690,10 +687,9 @@ fn create_account_with_empty_storage_slots() -> anyhow::Result<()> {
 
     for account_type in [AccountType::FungibleFaucet, AccountType::RegularAccountUpdatableCode] {
         let mock_chain = MockChain::new();
-        let (auth_component, _) = Auth::Mock.build_component();
         let (account, seed) = AccountBuilder::new([5; 32])
             .account_type(account_type)
-            .with_auth_component(auth_component)
+            .with_auth_component(Auth::Mock)
             .with_component(
                 AccountMockComponent::new_with_empty_slots(TransactionKernel::testing_assembler())
                     .unwrap(),
@@ -856,9 +852,8 @@ fn test_authenticate_procedure() -> miette::Result<()> {
     let mock_component =
         AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap();
 
-    let (auth_component, _) = Auth::Mock.build_component();
     let account_code = AccountCode::from_components(
-        &[auth_component, mock_component.into()],
+        &[Auth::Mock.into(), mock_component.into()],
         AccountType::RegularAccountUpdatableCode,
     )
     .unwrap();

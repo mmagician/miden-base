@@ -1,4 +1,3 @@
-use crate::assert_execution_error;
 use miden_lib::{errors::MasmError, transaction::TransactionKernel};
 use miden_objects::{
     account::Account,
@@ -6,19 +5,19 @@ use miden_objects::{
         account_component::{ConditionalAuthComponent, ERR_WRONG_ARGS_MSG},
         account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
     },
-    transaction::AuthArguments,
 };
 use miden_tx::TransactionExecutorError;
+use vm_processor::{AdviceInputs, Digest};
 
 use super::{Felt, ONE};
-use crate::TransactionContextBuilder;
+use crate::{TransactionContextBuilder, assert_execution_error};
 
 pub const ERR_WRONG_ARGS: MasmError = MasmError::from_static_str(ERR_WRONG_ARGS_MSG);
 
 #[test]
 fn test_auth_procedure_args() {
     let auth_component =
-        ConditionalAuthComponent::from_assembler(TransactionKernel::testing_assembler()).unwrap();
+        ConditionalAuthComponent::new(TransactionKernel::testing_assembler()).unwrap();
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
         ONE,
@@ -34,8 +33,14 @@ fn test_auth_procedure_args() {
         ONE, // incr_nonce = true
     ];
 
+    let auth_argument_key = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+
+    let advice_inputs = AdviceInputs::default()
+        .with_map([(Digest::new(auth_argument_key), auth_arguments.to_vec())]);
+
     let tx_context = TransactionContextBuilder::new(account)
-        .auth_arguments(AuthArguments::new(&auth_arguments))
+        .auth_argument(auth_argument_key)
+        .extend_advice_inputs(advice_inputs)
         .build();
 
     let executed_transaction = tx_context.execute();
@@ -50,7 +55,7 @@ fn test_auth_procedure_args() {
 #[test]
 fn test_auth_procedure_args_wrong_inputs() {
     let auth_component =
-        ConditionalAuthComponent::from_assembler(TransactionKernel::testing_assembler()).unwrap();
+        ConditionalAuthComponent::new(TransactionKernel::testing_assembler()).unwrap();
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
         ONE,
@@ -67,8 +72,14 @@ fn test_auth_procedure_args_wrong_inputs() {
         ONE, // incr_nonce = true
     ];
 
+    let auth_argument_key = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+
+    let advice_inputs = AdviceInputs::default()
+        .with_map([(Digest::new(auth_argument_key), auth_arguments.to_vec())]);
+
     let tx_context = TransactionContextBuilder::new(account)
-        .auth_arguments(AuthArguments::new(&auth_arguments))
+        .auth_argument(auth_argument_key)
+        .extend_advice_inputs(advice_inputs)
         .build();
 
     let executed_transaction = tx_context.execute();

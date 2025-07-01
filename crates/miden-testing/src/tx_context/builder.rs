@@ -5,7 +5,7 @@ use alloc::{collections::BTreeMap, vec::Vec};
 
 use miden_lib::{transaction::TransactionKernel, utils::word_to_masm_push_string};
 use miden_objects::{
-    Digest, FieldElement,
+    EMPTY_WORD, FieldElement,
     account::{Account, AccountId},
     assembly::Assembler,
     asset::{Asset, FungibleAsset, NonFungibleAsset},
@@ -25,8 +25,7 @@ use miden_objects::{
         storage::prepare_assets,
     },
     transaction::{
-        AccountInputs, AuthArguments, OutputNote, TransactionArgs, TransactionInputs,
-        TransactionScript,
+        AccountInputs, OutputNote, TransactionArgs, TransactionInputs, TransactionScript,
     },
     vm::AdviceMap,
 };
@@ -80,9 +79,10 @@ pub struct TransactionContextBuilder {
     foreign_account_inputs: Vec<AccountInputs>,
     input_notes: Vec<Note>,
     tx_script: Option<TransactionScript>,
+    tx_script_arg: Word,
     note_args: BTreeMap<NoteId, Word>,
     transaction_inputs: Option<TransactionInputs>,
-    auth_arguments: Option<AuthArguments>,
+    auth_argument: Word,
     rng: ChaCha20Rng,
 }
 
@@ -96,12 +96,13 @@ impl TransactionContextBuilder {
             expected_output_notes: Vec::new(),
             rng: ChaCha20Rng::from_seed([0_u8; 32]),
             tx_script: None,
+            tx_script_arg: EMPTY_WORD,
             authenticator: None,
             advice_inputs: Default::default(),
             transaction_inputs: None,
             note_args: BTreeMap::new(),
             foreign_account_inputs: vec![],
-            auth_arguments: None,
+            auth_argument: EMPTY_WORD,
         }
     }
 
@@ -109,7 +110,7 @@ impl TransactionContextBuilder {
     pub fn with_standard_account(nonce: Felt) -> Self {
         // Build standard account with normal assembler because the testing one already contains it
         let assembler = TransactionKernel::testing_assembler();
-        let auth_component = MockAuthComponent::from_assembler(assembler.clone()).unwrap().into();
+        let auth_component = MockAuthComponent::new(assembler.clone()).unwrap().into();
 
         let account = Account::mock(
             ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
@@ -130,16 +131,17 @@ impl TransactionContextBuilder {
             advice_inputs: Default::default(),
             rng: ChaCha20Rng::from_seed([0_u8; 32]),
             tx_script: None,
+            tx_script_arg: EMPTY_WORD,
             transaction_inputs: None,
             note_args: BTreeMap::new(),
             foreign_account_inputs: vec![],
-            auth_arguments: None,
+            auth_argument: EMPTY_WORD,
         }
     }
 
     pub fn with_noop_auth_account(nonce: Felt) -> Self {
         let assembler = TransactionKernel::testing_assembler();
-        let auth_component = NoopAuthComponent::from_assembler(assembler.clone()).unwrap().into();
+        let auth_component = NoopAuthComponent::new(assembler.clone()).unwrap().into();
 
         let account = Account::mock(
             ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
@@ -181,9 +183,19 @@ impl TransactionContextBuilder {
         self
     }
 
-    /// Override and set the [AdviceInputs]
-    pub fn advice_inputs(mut self, advice_inputs: AdviceInputs) -> Self {
-        self.advice_inputs = advice_inputs;
+    /// Extend the advice inputs with the provided [AdviceInputs] instance.
+    pub fn extend_advice_inputs(mut self, advice_inputs: AdviceInputs) -> Self {
+        self.advice_inputs.extend(advice_inputs);
+        self
+    }
+
+    /// Extend the advice inputs map with the provided iterator.
+    pub fn extend_advice_map(
+        mut self,
+        map_entries: impl IntoIterator<Item = (Word, Vec<Felt>)>,
+    ) -> Self {
+        self.advice_inputs
+            .extend_map(map_entries.into_iter().map(|(hash, input)| (hash.into(), input)));
         self
     }
 
@@ -200,14 +212,8 @@ impl TransactionContextBuilder {
     }
 
     /// Extend the set of used input notes
-    pub fn input_notes(mut self, input_notes: Vec<Note>) -> Self {
+    pub fn extend_input_notes(mut self, input_notes: Vec<Note>) -> Self {
         self.input_notes.extend(input_notes);
-        self
-    }
-
-    // Set the desired note args
-    pub fn note_args(mut self, args: BTreeMap<NoteId, Word>) -> Self {
-        self.note_args = args;
         self
     }
 
@@ -217,9 +223,15 @@ impl TransactionContextBuilder {
         self
     }
 
-    /// Set the desired auth arguments
-    pub fn auth_arguments(mut self, auth_arguments: impl Into<AuthArguments>) -> Self {
-        self.auth_arguments = Some(auth_arguments.into());
+    /// Set the desired auth argument
+    pub fn auth_argument(mut self, auth_argument: Word) -> Self {
+        self.auth_argument = auth_argument;
+        self
+    }
+
+    /// Set the transaction script argument
+    pub fn tx_script_arg(mut self, tx_script_arg: Word) -> Self {
+        self.tx_script_arg = tx_script_arg;
         self
     }
 
@@ -229,8 +241,14 @@ impl TransactionContextBuilder {
         self
     }
 
-    /// Defines the expected output notes
-    pub fn expected_notes(mut self, output_notes: Vec<OutputNote>) -> Self {
+    /// Extend the note arguments map with the provided one.
+    pub fn extend_note_args(mut self, note_args: BTreeMap<NoteId, Word>) -> Self {
+        self.note_args.extend(note_args);
+        self
+    }
+
+    /// Extend the expected output notes.
+    pub fn extend_expected_output_notes(mut self, output_notes: Vec<OutputNote>) -> Self {
         let output_notes = output_notes.into_iter().filter_map(|n| match n {
             OutputNote::Full(note) => Some(note),
             OutputNote::Partial(_) => None,
@@ -494,7 +512,7 @@ impl TransactionContextBuilder {
             fungible_asset_1,
         );
 
-        self.input_notes(vec![input_note1])
+        self.extend_input_notes(vec![input_note1])
     }
 
     /// Adds a set of input notes that output notes in an asset-preserving manner.
@@ -533,7 +551,7 @@ impl TransactionContextBuilder {
             &output_note2,
         );
 
-        self.input_notes(vec![input_note1, input_note2])
+        self.extend_input_notes(vec![input_note1, input_note2])
     }
 
     pub fn with_mock_notes_preserved_with_account_vault_delta(mut self) -> Self {
@@ -575,7 +593,7 @@ impl TransactionContextBuilder {
         let input_note5 = self
             .input_note_transfer(sender, [fungible_asset_1, fungible_asset_3, nonfungible_asset_1]);
 
-        self.input_notes(vec![input_note1, input_note2, input_note5])
+        self.extend_input_notes(vec![input_note1, input_note2, input_note5])
     }
 
     pub fn with_mock_notes_too_many_fungible_input(mut self) -> Self {
@@ -615,7 +633,7 @@ impl TransactionContextBuilder {
         let input_note3 =
             self.input_note_simple(sender, [fungible_asset_2, fungible_asset_3], [2u32.into()]);
 
-        self.input_notes(vec![input_note1, input_note2, input_note3])
+        self.extend_input_notes(vec![input_note1, input_note2, input_note3])
     }
 
     pub fn with_mock_notes_too_many_non_fungible_input(mut self) -> Self {
@@ -655,7 +673,7 @@ impl TransactionContextBuilder {
         );
         let input_note4 = self.input_note_simple(sender, [nonfungible_asset_1], [1u32.into()]);
 
-        self.input_notes(vec![input_note1, input_note2, input_note4])
+        self.extend_input_notes(vec![input_note1, input_note2, input_note4])
     }
 
     /// Builds the [TransactionContext].
@@ -691,13 +709,16 @@ impl TransactionContextBuilder {
             },
         };
 
-        let mut tx_args = TransactionArgs::new(
-            self.tx_script,
-            Some(self.note_args),
-            AdviceMap::default(),
-            self.foreign_account_inputs,
-            self.auth_arguments,
-        );
+        let tx_args = TransactionArgs::new(AdviceMap::default(), self.foreign_account_inputs)
+            .with_note_args(self.note_args);
+
+        let mut tx_args = if let Some(tx_script) = self.tx_script {
+            tx_args.with_tx_script_and_arg(tx_script, self.tx_script_arg)
+        } else {
+            tx_args
+        };
+
+        tx_args = tx_args.with_auth_argument(self.auth_argument);
 
         tx_args.extend_advice_inputs(self.advice_inputs.clone());
         tx_args.extend_output_note_recipients(self.expected_output_notes.clone());

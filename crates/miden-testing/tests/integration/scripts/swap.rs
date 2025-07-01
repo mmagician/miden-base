@@ -39,7 +39,7 @@ pub fn prove_send_swap_note() {
 
             push.{asset}
             call.::miden::contracts::wallets::basic::move_asset_to_note
-            call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512
+            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512
             dropw dropw dropw dropw
         end
         ",
@@ -51,13 +51,12 @@ pub fn prove_send_swap_note() {
     );
 
     let tx_script =
-        TransactionScript::compile(tx_script_src, vec![], TransactionKernel::testing_assembler())
-            .unwrap();
+        TransactionScript::compile(tx_script_src, TransactionKernel::testing_assembler()).unwrap();
 
     let create_swap_note_tx = mock_chain
         .build_tx_context(sender_account.id(), &[], &[])
         .tx_script(tx_script)
-        .expected_notes(vec![OutputNote::Full(note.clone())])
+        .extend_expected_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .execute()
         .unwrap();

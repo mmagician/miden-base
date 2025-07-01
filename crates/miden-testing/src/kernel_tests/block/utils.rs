@@ -1,6 +1,5 @@
-use std::{collections::BTreeMap, vec, vec::Vec};
+use std::{collections::BTreeMap, string::ToString, vec, vec::Vec};
 
-use miden_crypto::{ONE, ZERO, rand::RpoRandomCoin};
 use miden_lib::{note::create_p2id_note, transaction::TransactionKernel};
 use miden_objects::{
     Felt,
@@ -8,16 +7,16 @@ use miden_objects::{
     asset::{Asset, FungibleAsset},
     batch::ProvenBatch,
     block::BlockNumber,
+    crypto::rand::RpoRandomCoin,
     note::{Note, NoteId, NoteTag, NoteType},
     testing::{
         account_component::AccountMockComponent, account_id::ACCOUNT_ID_SENDER, note::NoteBuilder,
     },
-    transaction::{
-        AuthArguments, ExecutedTransaction, OutputNote, ProvenTransaction, TransactionScript,
-    },
+    transaction::{ExecutedTransaction, OutputNote, ProvenTransaction, TransactionScript},
     utils::word_to_masm_push_string,
 };
 use rand::{Rng, SeedableRng, rngs::SmallRng};
+use vm_processor::{AdviceInputs, Digest, ONE, ZERO};
 
 use crate::{AccountState, Auth, MockChain, TxContextInput, mock_chain::ProvenTransactionExt};
 
@@ -170,16 +169,22 @@ pub fn generate_noop_tx(
     chain.add_pending_note(OutputNote::Full(noop_note.clone()));
     chain.prove_next_block();
 
+    let auth_argument_key = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+    let auth_arguments = [
+        Felt::new(99),
+        Felt::new(98),
+        Felt::new(97),
+        Felt::new(96),
+        ZERO, // increment nonce
+    ];
+    let advice_inputs = AdviceInputs::default()
+        .with_map([(Digest::new(auth_argument_key), auth_arguments.to_vec())]);
+
     let tx_context = chain
         .build_tx_context(input.into(), &[noop_note.id()], &[])
-        .input_notes(vec![noop_note])
-        .auth_arguments(AuthArguments::new(&[
-            Felt::new(99),
-            Felt::new(98),
-            Felt::new(97),
-            Felt::new(96),
-            ZERO, // don't increment nonce
-        ]))
+        .extend_input_notes(vec![noop_note])
+        .auth_argument(auth_argument_key)
+        .extend_advice_inputs(advice_inputs)
         .build();
     tx_context.execute().unwrap()
 }
@@ -189,16 +194,22 @@ pub fn generate_tx_with_storage_increment(
     chain: &mut MockChain,
     input: impl Into<TxContextInput>,
 ) -> ProvenTransaction {
+    let auth_argument_key = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+    let auth_arguments = [
+        Felt::new(99),
+        Felt::new(98),
+        Felt::new(97),
+        Felt::new(96),
+        ONE, // increment nonce
+    ];
+    let advice_inputs = AdviceInputs::default()
+        .with_map([(Digest::new(auth_argument_key), auth_arguments.to_vec())]);
+
     let tx_context = chain
         .build_tx_context(input, &[], &[])
         .tx_script(bump_storage_tx_script())
-        .auth_arguments(AuthArguments::new(&[
-            Felt::new(99),
-            Felt::new(98),
-            Felt::new(97),
-            Felt::new(96),
-            ONE, // increment nonce
-        ]))
+        .auth_argument(auth_argument_key)
+        .extend_advice_inputs(advice_inputs)
         .build();
     let executed_tx = tx_context.execute().unwrap();
     ProvenTransaction::from_executed_transaction_mocked(executed_tx)
@@ -244,13 +255,12 @@ fn update_expiration_tx_script(expiration_delta: u16) -> TransactionScript {
         "
     );
 
-    TransactionScript::compile(code, [], TransactionKernel::testing_assembler_with_mock_account())
+    TransactionScript::compile(code, TransactionKernel::testing_assembler_with_mock_account())
         .unwrap()
 }
 
 fn bump_storage_tx_script() -> TransactionScript {
-    let code = format!(
-        "
+    let code = "
         use.test::account
 
         begin
@@ -260,9 +270,9 @@ fn bump_storage_tx_script() -> TransactionScript {
             dropw dropw dropw dropw
         end
         "
-    );
+    .to_string();
 
-    TransactionScript::compile(code, [], TransactionKernel::testing_assembler_with_mock_account())
+    TransactionScript::compile(code, TransactionKernel::testing_assembler_with_mock_account())
         .unwrap()
 }
 

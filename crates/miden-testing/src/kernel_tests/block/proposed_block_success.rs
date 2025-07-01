@@ -17,7 +17,8 @@ use super::utils::{
 use crate::{
     ProvenTransactionExt,
     kernel_tests::block::utils::{
-        generate_account_with_conditional_auth, generate_noop_tx, generate_tx_with_storage_increment,
+        generate_account_with_conditional_auth, generate_noop_tx,
+        generate_tx_with_storage_increment,
     },
 };
 
