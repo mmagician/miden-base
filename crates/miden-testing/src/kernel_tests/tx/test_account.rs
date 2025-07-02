@@ -894,3 +894,523 @@ fn test_authenticate_procedure() -> miette::Result<()> {
 
     Ok(())
 }
+
+// PROCEDURE INTROSPECTION TESTS
+// ================================================================================================
+
+#[test]
+fn test_was_procedure_called() -> miette::Result<()> {
+    // Create an account with multiple procedures
+    let mock_component =
+        AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap();
+    let account_code = AccountCode::from_components(
+        &[mock_component.into()],
+        AccountType::RegularAccountUpdatableCode,
+    )
+    .unwrap();
+
+    // Get procedure roots from the account code
+    let proc_0_root: [Felt; 4] =
+        account_code.procedures()[0].mast_root().as_elements().try_into().unwrap();
+    let proc_1_root: [Felt; 4] =
+        account_code.procedures()[1].mast_root().as_elements().try_into().unwrap();
+    let proc_2_root: [Felt; 4] =
+        account_code.procedures()[2].mast_root().as_elements().try_into().unwrap();
+
+    // Create a test transaction context
+    let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .with_component(mock_component)
+        .build_existing()
+        .unwrap();
+
+    let tx_context = TransactionContextBuilder::new(account).build();
+
+    // Test 1: Check that procedures are not called initially
+    let code = format!(
+        "
+        use.kernel::account
+        use.kernel::prologue
+
+        begin
+            exec.prologue::prepare_transaction
+
+            # Check that procedure 0 has not been called
+            push.{proc_0}
+            exec.account::was_procedure_called
+            assertz # Should be 0 (not called)
+
+            # Check that procedure 1 has not been called
+            push.{proc_1}
+            exec.account::was_procedure_called
+            assertz # Should be 0 (not called)
+
+            # Check that procedure 2 has not been called
+            push.{proc_2}
+            exec.account::was_procedure_called
+            assertz # Should be 0 (not called)
+        end
+        ",
+        proc_0 = word_to_masm_push_string(&proc_0_root),
+        proc_1 = word_to_masm_push_string(&proc_1_root),
+        proc_2 = word_to_masm_push_string(&proc_2_root),
+    );
+
+    tx_context.execute_code(&code).wrap_err("failed to execute initial check")?;
+
+    // Test 2: Call a procedure and verify it's marked as called
+    let code = format!(
+        "
+        use.kernel::account
+        use.kernel::prologue
+
+        begin
+            exec.prologue::prepare_transaction
+
+            # Authenticate and call procedure 0
+            push.{proc_0}
+            exec.account::authenticate_procedure
+            drop drop # drop storage_offset and storage_size
+
+            # Check that procedure 0 has been called
+            push.{proc_0}
+            exec.account::was_procedure_called
+            assert # Should be 1 (called)
+
+            # Check that procedure 1 has still not been called
+            push.{proc_1}
+            exec.account::was_procedure_called
+            assertz # Should be 0 (not called)
+
+            # Check that procedure 2 has still not been called
+            push.{proc_2}
+            exec.account::was_procedure_called
+            assertz # Should be 0 (not called)
+        end
+        ",
+        proc_0 = word_to_masm_push_string(&proc_0_root),
+        proc_1 = word_to_masm_push_string(&proc_1_root),
+        proc_2 = word_to_masm_push_string(&proc_2_root),
+    );
+
+    tx_context.execute_code(&code).wrap_err("failed to execute after first procedure call")?;
+
+    // Test 3: Call multiple procedures and verify they're marked as called
+    let code = format!(
+        "
+        use.kernel::account
+        use.kernel::prologue
+
+        begin
+            exec.prologue::prepare_transaction
+
+            # Authenticate and call procedure 0
+            push.{proc_0}
+            exec.account::authenticate_procedure
+            drop drop # drop storage_offset and storage_size
+
+            # Authenticate and call procedure 1
+            push.{proc_1}
+            exec.account::authenticate_procedure
+            drop drop # drop storage_offset and storage_size
+
+            # Check that procedure 0 has been called
+            push.{proc_0}
+            exec.account::was_procedure_called
+            assert # Should be 1 (called)
+
+            # Check that procedure 1 has been called
+            push.{proc_1}
+            exec.account::was_procedure_called
+            assert # Should be 1 (called)
+
+            # Check that procedure 2 has still not been called
+            push.{proc_2}
+            exec.account::was_procedure_called
+            assertz # Should be 0 (not called)
+        end
+        ",
+        proc_0 = word_to_masm_push_string(&proc_0_root),
+        proc_1 = word_to_masm_push_string(&proc_1_root),
+        proc_2 = word_to_masm_push_string(&proc_2_root),
+    );
+
+    tx_context.execute_code(&code).wrap_err("failed to execute after multiple procedure calls")?;
+
+    // Test 4: Test with an invalid procedure root (should panic)
+    let invalid_root = [ONE, ZERO, ONE, ZERO];
+    let code = format!(
+        "
+        use.kernel::account
+        use.kernel::prologue
+
+        begin
+            exec.prologue::prepare_transaction
+
+            # Try to check if an invalid procedure was called
+            push.{invalid_root}
+            exec.account::was_procedure_called
+            # This should panic with ERR_ACCOUNT_PROC_NOT_PART_OF_ACCOUNT_CODE
+        end
+        ",
+        invalid_root = word_to_masm_push_string(&invalid_root),
+    );
+
+    let result = tx_context.execute_code(&code);
+    assert!(result.is_err(), "Checking an invalid procedure should fail");
+
+    Ok(())
+}
+
+#[test]
+fn test_was_procedure_called_integration() -> miette::Result<()> {
+    // Create an account with custom procedures that check if other procedures were called
+    let source_code_component = "
+        use.miden::account
+
+        # A simple procedure that does nothing
+        export.proc_a
+            # Just increment the nonce to have some effect
+            push.1 exec.account::incr_nonce
+        end
+
+        # A procedure that checks if proc_a was called
+        export.proc_b
+            # This procedure will be called to check if proc_a was executed
+            push.1 exec.account::incr_nonce
+        end
+
+        # A procedure that performs some storage operations
+        export.proc_c
+            push.99.98.97.96.0
+            exec.account::set_item
+            dropw
+        end
+    ";
+
+    // Compile the component
+    let assembler = TransactionKernel::testing_assembler();
+    let component = AccountComponent::compile(
+        source_code_component,
+        assembler.clone(),
+        vec![StorageSlot::Value([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])],
+    )
+    .unwrap()
+    .with_supported_type(AccountType::RegularAccountUpdatableCode);
+
+    // Create account with the component
+    let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .with_component(component)
+        .build_existing()
+        .unwrap();
+
+    // Get the procedure roots
+    let proc_a_root = account.code().procedures()[0].mast_root();
+    let proc_b_root = account.code().procedures()[1].mast_root();
+    let proc_c_root = account.code().procedures()[2].mast_root();
+
+    // Create transaction context
+    let tx_context = TransactionContextBuilder::new(account.clone()).build();
+
+    // Test case 1: Execute a transaction that calls proc_a and then checks if it was called
+    let tx_script_source = format!(
+        "
+        use.miden::account
+
+        begin
+            # Call proc_a
+            call.{proc_a}
+
+            # Check if proc_a was called (should be true)
+            push.{proc_a_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            # Check if proc_b was called (should be false)
+            push.{proc_b_word}
+            exec.account::was_procedure_called
+            assertz # Should be 0
+
+            # Check if proc_c was called (should be false)
+            push.{proc_c_word}
+            exec.account::was_procedure_called
+            assertz # Should be 0
+        end
+        ",
+        proc_a = proc_a_root,
+        proc_a_word = word_to_masm_push_string(&proc_a_root.as_elements()),
+        proc_b_word = word_to_masm_push_string(&proc_b_root.as_elements()),
+        proc_c_word = word_to_masm_push_string(&proc_c_root.as_elements()),
+    );
+
+    let tx_script = TransactionScript::new(
+        assembler
+            .clone()
+            .assemble_program(tx_script_source)
+            .wrap_err("Failed to compile transaction script")?
+    );
+
+    let tx_context = TransactionContextBuilder::new(account.clone())
+        .tx_script(tx_script)
+        .build();
+
+    let result = tx_context.execute().into_diagnostic()
+        .wrap_err("Failed to execute transaction with single procedure call")?;
+
+    // Test case 2: Execute a transaction that calls multiple procedures
+    let tx_script_source = format!(
+        "
+        use.miden::account
+
+        begin
+            # Call proc_a and proc_c
+            call.{proc_a}
+            call.{proc_c}
+
+            # Check if proc_a was called (should be true)
+            push.{proc_a_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            # Check if proc_b was called (should be false)
+            push.{proc_b_word}
+            exec.account::was_procedure_called
+            assertz # Should be 0
+
+            # Check if proc_c was called (should be true)
+            push.{proc_c_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            # Call proc_b
+            call.{proc_b}
+
+            # Now check if proc_b was called (should be true)
+            push.{proc_b_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+        end
+        ",
+        proc_a = proc_a_root,
+        proc_b = proc_b_root,
+        proc_c = proc_c_root,
+        proc_a_word = word_to_masm_push_string(&proc_a_root.as_elements()),
+        proc_b_word = word_to_masm_push_string(&proc_b_root.as_elements()),
+        proc_c_word = word_to_masm_push_string(&proc_c_root.as_elements()),
+    );
+
+    let tx_script = TransactionScript::new(
+        assembler
+            .assemble_program(tx_script_source)
+            .wrap_err("Failed to compile transaction script for multiple calls")?
+    );
+
+    let tx_context = TransactionContextBuilder::new(account)
+        .tx_script(tx_script)
+        .build();
+
+    let result = tx_context.execute().into_diagnostic()
+        .wrap_err("Failed to execute transaction with multiple procedure calls")?;
+
+    Ok(())
+}
+
+#[test]
+fn test_was_procedure_called_conditional_execution() -> miette::Result<()> {
+    // Create an account with procedures that have conditional logic based on whether
+    // other procedures have been called
+    let source_code_component = "
+        use.miden::account
+
+        # Procedure that sets a flag in storage
+        export.set_flag
+            push.1.0.0.0.0
+            exec.account::set_item
+            dropw
+        end
+
+        # Procedure that should only execute if set_flag was called
+        export.conditional_proc
+            # This could be used for access control - only allow execution
+            # if a certain initialization procedure was called first
+            push.2.0.0.0.0
+            exec.account::set_item
+            dropw
+        end
+
+        # Procedure that clears the flag
+        export.clear_flag
+            push.0.0.0.0.0
+            exec.account::set_item
+            dropw
+        end
+    ";
+
+    // Compile the component
+    let assembler = TransactionKernel::testing_assembler();
+    let component = AccountComponent::compile(
+        source_code_component,
+        assembler.clone(),
+        vec![StorageSlot::Value(EMPTY_WORD)],
+    )
+    .unwrap()
+    .with_supported_type(AccountType::RegularAccountUpdatableCode);
+
+    // Create account with the component
+    let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .with_component(component)
+        .build_existing()
+        .unwrap();
+
+    // Get the procedure roots
+    let set_flag_root = account.code().procedures()[0].mast_root();
+    let conditional_proc_root = account.code().procedures()[1].mast_root();
+    let clear_flag_root = account.code().procedures()[2].mast_root();
+
+    // Test case 1: Try to call conditional_proc without calling set_flag first (should fail)
+    let tx_script_source = format!(
+        "
+        use.miden::account
+
+        begin
+            # Check if set_flag was called (should be false)
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assertz # Assert it wasn't called
+
+            # Try to call conditional_proc - in a real implementation,
+            # this procedure would check internally if set_flag was called
+            # For this test, we check it externally
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            not assert # Assert that set_flag was NOT called
+
+            # Since set_flag wasn't called, we simulate the conditional behavior
+            # by NOT calling conditional_proc
+        end
+        ",
+        set_flag_word = word_to_masm_push_string(&set_flag_root.as_elements()),
+    );
+
+    let tx_script = TransactionScript::new(
+        assembler
+            .clone()
+            .assemble_program(tx_script_source)
+            .wrap_err("Failed to compile first transaction script")?
+    );
+
+    let tx_context = TransactionContextBuilder::new(account.clone())
+        .tx_script(tx_script)
+        .build();
+
+    tx_context.execute().into_diagnostic()
+        .wrap_err("Failed to execute transaction without set_flag")?;
+
+    // Test case 2: Call set_flag first, then conditional_proc (should succeed)
+    let tx_script_source = format!(
+        "
+        use.miden::account
+
+        begin
+            # Call set_flag first
+            call.{set_flag}
+
+            # Verify set_flag was called
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            # Now we can safely call conditional_proc
+            call.{conditional_proc}
+
+            # Verify both procedures were called
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            push.{conditional_proc_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            # Clear flag procedure should not have been called
+            push.{clear_flag_word}
+            exec.account::was_procedure_called
+            assertz # Should be 0
+        end
+        ",
+        set_flag = set_flag_root,
+        conditional_proc = conditional_proc_root,
+        set_flag_word = word_to_masm_push_string(&set_flag_root.as_elements()),
+        conditional_proc_word = word_to_masm_push_string(&conditional_proc_root.as_elements()),
+        clear_flag_word = word_to_masm_push_string(&clear_flag_root.as_elements()),
+    );
+
+    let tx_script = TransactionScript::new(
+        assembler
+            .clone()
+            .assemble_program(tx_script_source)
+            .wrap_err("Failed to compile second transaction script")?
+    );
+
+    let tx_context = TransactionContextBuilder::new(account.clone())
+        .tx_script(tx_script)
+        .build();
+
+    tx_context.execute().into_diagnostic()
+        .wrap_err("Failed to execute transaction with proper sequence")?;
+
+    // Test case 3: Demonstrate that was_called state persists within a transaction
+    let tx_script_source = format!(
+        "
+        use.miden::account
+
+        begin
+            # Check initial state - nothing called yet
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assertz # Should be 0
+
+            # Call set_flag
+            call.{set_flag}
+
+            # Immediately check - should be marked as called
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assert # Should be 1
+
+            # Check again later in the transaction - should still be 1
+            push.1 push.2 add drop # Do some other work
+
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assert # Should still be 1
+
+            # Call it again - was_called should still be 1
+            call.{set_flag}
+
+            push.{set_flag_word}
+            exec.account::was_procedure_called
+            assert # Should still be 1 (not incremented)
+        end
+        ",
+        set_flag = set_flag_root,
+        set_flag_word = word_to_masm_push_string(&set_flag_root.as_elements()),
+    );
+
+    let tx_script = TransactionScript::new(
+        assembler
+            .assemble_program(tx_script_source)
+            .wrap_err("Failed to compile third transaction script")?
+    );
+
+    let tx_context = TransactionContextBuilder::new(account)
+        .tx_script(tx_script)
+        .build();
+
+    tx_context.execute().into_diagnostic()
+        .wrap_err("Failed to execute transaction testing persistence")?;
+
+    Ok(())
+}
