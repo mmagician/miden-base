@@ -274,6 +274,7 @@ impl TransactionContextBuilder {
         let code = format!(
             "
             use.miden::contracts::wallets::basic->wallet
+            use.miden::tx
             use.test::account
 
             begin
@@ -287,7 +288,7 @@ impl TransactionContextBuilder {
                 push.{tag}
                 # => [tag, aux, note_type, execution_hint, RECIPIENT, pad(8)]
 
-                call.wallet::create_note
+                call.tx::create_note
                 # => [note_idx, pad(15)]
 
                 push.{asset}
@@ -328,6 +329,7 @@ impl TransactionContextBuilder {
         let code = format!(
             "
             use.miden::contracts::wallets::basic->wallet
+            use.miden::tx
             use.test::account
 
             begin
@@ -342,7 +344,7 @@ impl TransactionContextBuilder {
                 push.{tag0}
                 # => [tag_0, aux_0, note_type, execution_hint, RECIPIENT_0, pad(8)]
 
-                call.wallet::create_note
+                call.tx::create_note
                 # => [note_idx_0, pad(15)]
 
                 push.{asset0}
@@ -361,7 +363,7 @@ impl TransactionContextBuilder {
                 push.{tag1}
                 # => [tag_1, aux_1, note_type, execution_hint, RECIPIENT_1, pad(8)]
 
-                call.wallet::create_note
+                call.tx::create_note
                 # => [note_idx_1, pad(15)]
                 
                 push.{asset1}

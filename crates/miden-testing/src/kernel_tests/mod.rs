@@ -195,7 +195,7 @@ fn executed_transaction_account_delta_new() {
             # => [tag, aux, note_type, execution_hint, RECIPIENT, pad(8)]
 
             # create the note
-            call.::miden::contracts::wallets::basic::create_note
+            call.tx::create_note
             # => [note_idx, pad(15)]
 
             # move an asset to the created note to partially deplete fungible asset balance
@@ -217,6 +217,7 @@ fn executed_transaction_account_delta_new() {
     let tx_script_src = format!(
         "\
         use.test::account
+        use.miden::tx
 
         ## TRANSACTION SCRIPT
         ## ========================================================================================
@@ -448,6 +449,7 @@ fn test_send_note_proc() -> miette::Result<()> {
         let tx_script_src = format!(
             "\
             use.miden::contracts::wallets::basic->wallet
+            use.miden::tx
             use.test::account
 
             ## TRANSACTION SCRIPT
@@ -465,7 +467,7 @@ fn test_send_note_proc() -> miette::Result<()> {
                 padw padw swapdw
                 # => [tag, aux, execution_hint, note_type, RECIPIENT, pad(8) ...]
 
-                call.wallet::create_note
+                call.tx::create_note
                 # => [note_idx, GARBAGE(15)]
 
                 movdn.4
@@ -608,6 +610,7 @@ fn executed_transaction_output_notes() {
     let tx_script_src = format!(
         "\
         use.miden::contracts::wallets::basic->wallet
+        use.miden::tx
         use.test::account
 
         # Inputs:  [tag, aux, note_type, execution_hint, RECIPIENT]
@@ -618,7 +621,7 @@ fn executed_transaction_output_notes() {
             padw padw swapdw
             # => [tag, aux, execution_hint, note_type, RECIPIENT, pad(8)]
 
-            call.wallet::create_note
+            call.tx::create_note
             # => [note_idx, pad(15)]
 
             # remove excess PADs from the stack

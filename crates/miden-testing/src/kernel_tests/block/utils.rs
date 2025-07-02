@@ -73,7 +73,7 @@ pub fn generate_untracked_note_with_output_note(sender: AccountId, output_note: 
     // A note script that creates the note that was passed in.
     let code = format!(
         "
-    use.test::account
+    use.miden::tx
 
     begin
         padw padw
@@ -84,7 +84,7 @@ pub fn generate_untracked_note_with_output_note(sender: AccountId, output_note: 
         push.{tag}
         # => [tag, aux, note_type, execution_hint, RECIPIENT, pad(8)]
 
-        call.account::create_note drop
+        call.tx::create_note drop
         # => [pad(16)]
 
         dropw dropw dropw dropw dropw
