@@ -837,3 +837,136 @@ fn test_public_key_as_note_input() {
         .build();
     tx_context.execute().unwrap();
 }
+
+#[test]
+fn test_add_asset_to_note() -> anyhow::Result<()> {
+    // Create a recipient account for the output note
+    let recipient_account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+    let recipient_digest = recipient_account_id.digest();
+
+    // Create an asset to pass through
+    let test_asset = FungibleAsset::mock(1000);
+    
+    // Create the custom note script code
+    let pass_through_script_code = r#"
+use.miden::note
+use.miden::tx
+
+# ERRORS
+# =================================================================================================
+
+const.ERR_PASS_THROUGH_WRONG_NUMBER_OF_ASSETS="PASS_THROUGH script requires exactly 1 note asset"
+
+begin
+    # store the note inputs to memory starting at address 0
+    push.0 exec.note::get_inputs
+    # => [num_inputs, inputs_ptr]
+
+    # make sure we have the correct number of inputs (5: 4 for recipient, 1 for tag)
+    eq.5 assert
+    # => [inputs_ptr]
+
+    # load RECIPIENT
+    padw mem_loadw
+    # => [RECIPIENT]
+
+    # load TAG
+    padw mem_load.4
+    # => [tag, 0, 0, 0, RECIPIENT]
+
+    # drop the padding
+    movdn.3 drop drop drop
+    # => [tag, RECIPIENT]
+
+    # store the note assets to memory starting at address 12
+    push.12 exec.note::get_assets
+    # => [num_assets, assets_ptr, tag, RECIPIENT]
+
+    # make sure the number of assets is 1
+    assert.err=ERR_PASS_THROUGH_WRONG_NUMBER_OF_ASSETS
+    # => [assets_ptr, tag, RECIPIENT]
+
+    # load the ASSET
+    mem_loadw
+    # => [ASSET, tag, RECIPIENT]
+
+    # prepare stack for create_note
+    # we need: [tag, aux, note_type, execution_hint, RECIPIENT]
+    movup.4            # => [tag, ASSET]
+    push.0             # => [aux=0, tag, ASSET]
+    push.1             # => [note_type=PUBLIC_NOTE, aux, tag, ASSET]
+    push.0             # => [execution_hint=0, note_type, aux, tag, ASSET]
+    movdnw.2           # => [tag, aux, note_type, execution_hint, ASSET, RECIPIENT]
+    swapw              # => [ASSET, tag, aux, note_type, execution_hint, RECIPIENT]
+
+    # create the note
+    movupw.2
+    # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
+    exec.tx::create_note
+    # => [note_idx, ASSET]
+
+    # add the asset to the note directly
+    swap
+    # => [ASSET, note_idx]
+    exec.tx::add_asset_to_note
+    # => [ASSET, note_idx]
+
+    # clean up the stack
+    dropw drop
+    # => []
+end"#;
+
+    // Compile the note script
+    let pass_through_script = NoteScript::compile(
+        pass_through_script_code,
+        TransactionKernel::testing_assembler()
+    ).context("Failed to compile pass-through script")?;
+
+    // Create note inputs (RECIPIENT + TAG)
+    let mut note_inputs = recipient_digest.to_vec();
+    note_inputs.push(Felt::new(123456)); // tag value
+    
+    // Create the input note with our custom script
+    let input_note = NoteBuilder::new(
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE.try_into().unwrap(),
+        &mut ChaCha20Rng::from_os_rng()
+    )
+    .note_inputs(note_inputs)
+    .context("Failed to set note inputs")?
+    .script(pass_through_script)
+    .add_assets(vec![test_asset.into()])
+    .build(&TransactionKernel::testing_assembler())
+    .context("Failed to build note")?;
+
+    // Create transaction context and execute
+    let tx_context = TransactionContextBuilder::with_standard_account(ONE)
+        .extend_input_notes(vec![input_note])
+        .build();
+    
+    let executed_tx = tx_context.execute().context("Transaction execution failed")?;
+
+    // Verify the output note was created with the asset
+    let output_notes = executed_tx.output_notes();
+    
+    // We expect one output note (the mock setup includes 3 default notes, so we check for note 4)
+    assert_eq!(output_notes.num_notes(), 4, "Expected 4 output notes (3 default + 1 created)");
+    
+    // Get our created note (index 3, as indexing starts at 0)
+    let created_note = output_notes.get_note(3);
+    
+    // Verify the recipient
+    assert_eq!(
+        created_note.recipient().digest(),
+        recipient_digest,
+        "Output note recipient mismatch"
+    );
+    
+    // Verify the asset was added to the note
+    let note_assets = created_note.assets().context("Output note should have assets")?;
+    assert_eq!(note_assets.num_assets(), 1, "Output note should have exactly 1 asset");
+    
+    let output_asset = note_assets.get_asset(0).context("Failed to get asset from output note")?;
+    assert_eq!(output_asset, test_asset.into(), "Output asset doesn't match input asset");
+    
+    Ok(())
+}
