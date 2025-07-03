@@ -261,7 +261,6 @@ fn test_basic_wallet_custom_notes() {
     );
 
     let incompatible_source_code = "
-        use.miden::tx
         use.miden::contracts::wallets::basic->wallet
         use.miden::contracts::faucets::basic_fungible->fungible_faucet
 
@@ -325,7 +324,6 @@ fn test_basic_fungible_faucet_custom_notes() {
     let vault = NoteAssets::new(vec![FungibleAsset::mock(100)]).unwrap();
 
     let compatible_source_code = "
-        use.miden::tx
         use.miden::contracts::wallets::basic->wallet
         use.miden::contracts::faucets::basic_fungible->fungible_faucet
 
@@ -341,7 +339,6 @@ fn test_basic_fungible_faucet_custom_notes() {
 
                 # unsupported procs
                 call.wallet::receive_asset
-                call.tx::create_note
                 call.wallet::move_asset_to_note
             end
         end
@@ -357,7 +354,6 @@ fn test_basic_fungible_faucet_custom_notes() {
     );
 
     let incompatible_source_code = "
-        use.miden::tx
         use.miden::contracts::wallets::basic->wallet
         use.miden::contracts::faucets::basic_fungible->fungible_faucet
 
@@ -375,7 +371,6 @@ fn test_basic_fungible_faucet_custom_notes() {
                 call.fungible_faucet::burn
 
                 # unsupported procs
-                call.tx::create_note
                 call.wallet::move_asset_to_note
             end
         end
@@ -478,7 +473,6 @@ fn test_custom_account_custom_notes() {
     );
 
     let incompatible_source_code = "
-        use.miden::tx
         use.miden::contracts::wallets::basic->wallet
         use.test::account::component_1->test_account
 
@@ -489,7 +483,6 @@ fn test_custom_account_custom_notes() {
                 call.test_account::procedure_1
             else
                 call.test_account::procedure_2
-                call.tx::create_note
                 call.wallet::move_asset_to_note
             end
         end
