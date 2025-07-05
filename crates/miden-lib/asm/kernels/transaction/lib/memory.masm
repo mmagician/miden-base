@@ -158,6 +158,7 @@ const.ACCT_CODE_COMMITMENT_OFFSET=12
 const.ACCT_CORE_DATA_SECTION_END_OFFSET=16
 const.NUM_ACCT_PROCEDURES_OFFSET=28
 const.ACCT_PROCEDURES_SECTION_OFFSET=32
+const.ACCT_PROCEDURES_CALL_TRACKING_OFFSET=2080
 const.NUM_ACCT_STORAGE_SLOTS_OFFSET=2084
 const.ACCT_STORAGE_SLOTS_SECTION_OFFSET=2088
 
@@ -1087,6 +1088,17 @@ export.get_acct_procedures_section_ptr
     exec.get_current_account_data_ptr push.ACCT_PROCEDURES_SECTION_OFFSET add
 end
 
+#! Returns the memory pointer to the account procedures call tracking section.
+#!
+#! Inputs:  []
+#! Outputs: [procedures_call_tracking_ptr]
+#!
+#! Where:
+#! - procedures_call_tracking_ptr is the memory pointer to the procedure call tracking section.
+export.get_acct_procedures_call_tracking_ptr
+    exec.get_current_account_data_ptr push.ACCT_PROCEDURES_CALL_TRACKING_OFFSET add
+end
+
 ### ACCOUNT STORAGE #################################################
 
 #! Returns the account storage commitment.
@@ -1492,8 +1504,16 @@ end
 #! Where:
 #! - note_ptr is the memory address at which the input note data begins.
 #! - num_assets is the number of assets in the input note.
+#!
+#! Panics if:
+#! - the number of assets exceeds the maximum allowed number of assets per note.
 export.set_input_note_num_assets
     push.INPUT_NOTE_NUM_ASSETS_OFFSET add
+    # => [note_ptr + offset, num_assets]
+
+    # check note number of assets limit
+    dup.1 exec.constants::get_max_assets_per_note lt assert.err=ERR_NOTE_NUM_OF_ASSETS_EXCEED_LIMIT
+
     mem_store
 end
 

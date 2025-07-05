@@ -655,7 +655,11 @@ export.get_procedure_info
     # => [PROC_ROOT, storage_offset, storage_size, was_called]
 end
 
-#! Verifies that the procedure root is part of the account code.
+#! Verifies that the procedure root is part of the account code and tracks that it has been called.
+#!
+#! This procedure authenticates that a given procedure root exists in the account's code and sets
+#! a flag indicating that the procedure has been called during transaction execution. The tracking
+#! information is stored in a separate memory region to avoid complications with future code updates.
 #!
 #! Inputs:  [PROC_ROOT]
 #! Outputs: [storage_offset, storage_size]
@@ -681,21 +685,16 @@ export.authenticate_and_track_procedure
     movup.4 movdn.10 movup.4 movdn.10 movup.4 movdn.10 assert_eqw.err=ERR_ACCOUNT_PROC_NOT_PART_OF_ACCOUNT_CODE
     # => [storage_offset, storage_size, was_called, index]
 
-    # check if procedure was already called
-    movup.2
-    # => [was_called, storage_offset, storage_size, index]
+    # drop the was_called value from procedure metadata (no longer used)
+    movup.2 drop
+    # => [storage_offset, storage_size, index]
 
-    # if this is the first call, set was_called flag to 1
-    push.1 or
-    # => [was_called', storage_offset, storage_size, index]
+    # Get the offset to the section where procedure was_called data is stored
+    dup.2 exec.memory::get_acct_procedures_call_tracking_ptr
+    # => [was_called_offset, index, storage_offset, storage_size]
 
-    movup.3
-    mul.8 exec.memory::get_acct_procedures_section_ptr add add.4
-    # => [proc_metadata_ptr]
-    # was_called is the 2nd element of the metadata
-    add.2
-
-    mem_store
+    # save 1 to the was_called address
+    add push.1 swap mem_store
     # => [storage_offset, storage_size]
 end
 
@@ -1205,15 +1204,28 @@ export.was_procedure_called
     emit.ACCOUNT_PUSH_PROCEDURE_INDEX_EVENT adv_push.1
     # => [index, PROC_ROOT]
 
+    dup movdn.5
     # get procedure info (PROC_ROOT, storage_offset, storage_size, was_called) from memory stored at index
     exec.get_procedure_info
-    # => [MEM_PROC_ROOT, storage_offset, storage_size, was_called, PROC_ROOT]
+    # => [MEM_PROC_ROOT, storage_offset, storage_size, was_called, PROC_ROOT, index]
 
     # verify that PROC_ROOT exists in memory at index
     movup.4 movdn.10 movup.4 movdn.10 movup.4 movdn.10 assert_eqw.err=ERR_ACCOUNT_PROC_NOT_PART_OF_ACCOUNT_CODE
-    # => [storage_offset, storage_size, was_called]
+    # => [storage_offset, storage_size, was_called, index]
 
-    # drop storage_offset and storage_size, keep was_called
-    drop drop
+    # drop storage_offset, storage_size, and was_called from metadata (no longer used)
+    drop drop drop
+    # => [index]
+
+    # Get the offset to the section where procedure was_called data is stored
+    dup exec.memory::get_acct_procedures_call_tracking_ptr
+    # => [was_called_offset, index, index]
+
+    # load the value of was_called
+    add mem_load
+    # => [was_called, index]
+
+    # clean up stack
+    swap drop
     # => [was_called]
 end

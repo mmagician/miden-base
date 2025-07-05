@@ -42,6 +42,7 @@
 - Add `with_auth_component` to `AccountBuilder` (#1480).
 - [BREAKING] Refactor account authentication to require a procedure containing `auth__` in its name (#1480).
 - Added procedure `was_procedure_called` to `miden::account` library module (#1521).
+- [BREAKING] Moved procedure call tracking from procedure metadata to a separate memory region for better handling of future code updates (#1521).
 
 ## 0.9.5 (2025-06-20) - `miden-lib` crate only
 
