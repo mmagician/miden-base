@@ -214,9 +214,7 @@ proc.compute_output_note_assets_hash
     # => [ASSETS_HASH, asset_data_ptr, asset_counter, num_asset_pairs, note_data_ptr]
 
     # drop accessory variables from stack
-    movup.4 drop
-    movup.4 drop
-    movup.4 drop
+    movup.6 movup.5 movup.4 drop drop drop
     # => [ASSETS_HASH, note_data_ptr]
 
     # save vault hash to memory
@@ -312,8 +310,7 @@ export.compute_output_notes_commitment
     # => [OUTPUT_NOTES_COMMITMENT, end_ptr, end_ptr, ...]
 
     # drop accessory variables from stack
-    movup.4 drop
-    movup.4 drop
+    movup.5 movup.4 drop drop
     # => [OUTPUT_NOTES_COMMITMENT, ...]
 end
 

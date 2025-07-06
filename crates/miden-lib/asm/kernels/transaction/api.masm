@@ -255,7 +255,7 @@ export.account_get_item
     # => [VALUE, pad(15)]
 
     # truncate the stack
-    movup.4 drop movup.4 drop movup.4 drop
+    movup.6 movup.5 movup.4 drop drop drop
     # => [VALUE, pad(12)]
 end
 

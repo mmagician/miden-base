@@ -411,7 +411,7 @@ end
 #! - INPUT_WORD is the word is compared with EMPTY_WORD.
 #! - is_empty is a boolean value that is 1 if INPUT_WORD is equal to EMPTY_WORD, and 0 otherwise.
 proc.is_empty_word_dropped
-    eq.0 swap eq.0 and swap eq.0 and swap eq.0 and
+    eq.0 swap eq.0 movup.2 eq.0 movup.3 eq.0 and and and
 end
 
 #! Saves the account data to memory and validates it.

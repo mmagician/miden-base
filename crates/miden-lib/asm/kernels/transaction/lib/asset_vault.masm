@@ -183,7 +183,7 @@ export.add_fungible_asset
     # => [ASSET', VAULT_ROOT, CUR_VAULT_VALUE, ASSET', vault_root_ptr]
     dupw
     # => [ASSET', ASSET', VAULT_ROOT, CUR_VAULT_VALUE, ASSET', vault_root_ptr]
-    push.0 swap.4 drop
+    movup.4 drop push.0 movdn.3
     # => [[faucet_id_prefix, faucet_id_suffix, 0, 0], ASSET', VAULT_ROOT, CUR_VAULT_VALUE, ASSET', vault_root_ptr]
     swapw
     # => [ASSET', ASSET_KEY', VAULT_ROOT, CUR_VAULT_VALUE, ASSET', vault_root_ptr]
