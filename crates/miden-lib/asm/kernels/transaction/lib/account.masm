@@ -419,7 +419,9 @@ export.get_item
     # => [acct_storage_slots_section_offset, index]
 
     # get the item from storage
-    swap mul.8 add padw movup.4 mem_loadw
+    swap mul.8 add
+    padw drop
+    mem_loadw
     # => [VALUE]
 end
 
@@ -1048,7 +1050,8 @@ proc.get_procedure_metadata
     # => [storage_offset_ptr]
 
     # load procedure metadata from memory and keep relevant data
-    padw movup.4 mem_loadw drop drop swap
+    padw drop
+    mem_loadw drop drop swap
     # => [storage_offset, storage_size]
 end
 

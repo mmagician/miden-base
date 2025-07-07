@@ -442,7 +442,9 @@ proc.get_item_initial
     # => [account_delta_initial_storage_slots_ptr, index]
 
     # get the item from storage
-    swap mul.8 add padw movup.4 mem_loadw
+    swap mul.8 add
+    padw drop
+    mem_loadw
     # => [INIT_VALUE]
 end
 

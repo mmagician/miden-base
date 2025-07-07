@@ -1347,7 +1347,9 @@ end
 #! - idx is the index of the input note.
 #! - nullifier is the nullifier of the input note.
 export.get_input_note_nullifier
-    mul.4 padw movup.4 push.INPUT_NOTE_NULLIFIER_SECTION_PTR add mem_loadw
+    mul.4 push.INPUT_NOTE_NULLIFIER_SECTION_PTR add
+    padw drop
+    mem_loadw
 end
 
 #! Returns a pointer to the start of the input note core data segment for the note located at the
@@ -1372,8 +1374,8 @@ end
 #! - note_ptr is the memory address at which the input note data begins.
 #! - SCRIPT_ROOT is the script root of the input note.
 export.get_input_note_script_root
-    padw
-    movup.4 push.INPUT_NOTE_SCRIPT_ROOT_OFFSET add
+    push.INPUT_NOTE_SCRIPT_ROOT_OFFSET add
+    padw drop
     mem_loadw
 end
 
@@ -1398,8 +1400,8 @@ end
 #! - note_ptr is the memory address at which the input note data begins.
 #! - INPUTS_COMMITMENT is the inputs commitment of the input note.
 export.get_input_note_inputs_commitment
-    padw
-    movup.4 push.INPUT_NOTE_INPUTS_COMMITMENT_OFFSET add
+    push.INPUT_NOTE_INPUTS_COMMITMENT_OFFSET add
+    padw drop
     mem_loadw
 end
 
@@ -1412,8 +1414,8 @@ end
 #! - note_ptr is the memory address at which the input note data begins.
 #! - METADATA is the metadata of the input note.
 export.get_input_note_metadata
-    padw
-    movup.4 push.INPUT_NOTE_METADATA_OFFSET add
+    push.INPUT_NOTE_METADATA_OFFSET add
+    padw drop
     mem_loadw
 end
 
@@ -1439,8 +1441,8 @@ end
 #! - note_ptr is the start memory address of the note.
 #! - NOTE_ARGS are the note's args.
 export.get_input_note_args
-    padw
-    movup.4 push.INPUT_NOTE_ARGS_OFFSET add
+    push.INPUT_NOTE_ARGS_OFFSET add
+    padw drop
     mem_loadw
 end
 
@@ -1531,8 +1533,8 @@ end
 #! - note_ptr is the memory address at which the input note data begins.
 #! - ASSET_COMMITMENT is the sequential hash of the padded assets of an input note.
 export.get_input_note_assets_hash
-    padw
-    movup.4 push.INPUT_NOTE_ASSETS_HASH_OFFSET add
+    push.INPUT_NOTE_ASSETS_HASH_OFFSET add
+    padw drop
     mem_loadw
 end
 
@@ -1545,8 +1547,8 @@ end
 #! - note_ptr is the memory address at which the input note data begins.
 #! - SERIAL_NUMBER is the input note's serial number.
 export.get_input_note_serial_num
-    padw
-    movup.4 push.INPUT_NOTE_SERIAL_NUM_OFFSET add
+    push.INPUT_NOTE_SERIAL_NUM_OFFSET add
+    padw drop
     mem_loadw
 end
 
@@ -1559,8 +1561,8 @@ end
 #! - note_ptr is the memory address at which the input note data begins.
 #! - sender is the sender for the input note.
 export.get_input_note_sender
-    padw
-    movup.4 push.INPUT_NOTE_METADATA_OFFSET add
+    push.INPUT_NOTE_METADATA_OFFSET add
+    padw drop
     mem_loadw
     # => [aux, merged_tag_hint_payload, merged_sender_id_type_hint_tag, sender_id_prefix]
 
@@ -1617,8 +1619,8 @@ end
 #! - output_note_data_ptr is the memory address at which the output note data begins.
 #! - RECIPIENT is the recipient of the output note.
 export.get_output_note_recipient
-    padw
-    movup.4 push.OUTPUT_NOTE_RECIPIENT_OFFSET add
+    push.OUTPUT_NOTE_RECIPIENT_OFFSET add
+    padw drop
     mem_loadw
 end
 

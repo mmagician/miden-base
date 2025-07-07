@@ -51,7 +51,7 @@ export.get_balance
     # => [faucet_id_prefix, faucet_id_suffix, vault_root_ptr]
 
     # get the asset vault root
-    padw movup.6 mem_loadw
+    movup.2 padw drop mem_loadw
     # => [ASSET_VAULT_ROOT, faucet_id_prefix, faucet_id_suffix]
 
     # prepare the key for fungible asset lookup (pad least significant elements with zeros)

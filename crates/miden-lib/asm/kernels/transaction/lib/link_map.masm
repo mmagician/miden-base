@@ -744,10 +744,9 @@ end
 #! Inputs:  [entry_ptr]
 #! Outputs: [VALUE0]
 proc.get_value0
-    padw movup.4
-    # => [entry_ptr, pad(4)]
-
-    add.VALUE0_OFFSET mem_loadw
+    add.VALUE0_OFFSET
+    padw drop
+    mem_loadw
     # => [VALUE0]
 end
 
@@ -756,10 +755,9 @@ end
 #! Inputs:  [entry_ptr]
 #! Outputs: [VALUE1]
 proc.get_value1
-    padw movup.4
-    # => [entry_ptr, pad(4)]
-
-    add.VALUE1_OFFSET mem_loadw
+    add.VALUE1_OFFSET
+    padw drop
+    mem_loadw
     # => [VALUE1]
 end
 
@@ -776,10 +774,9 @@ end
 #! Inputs:  [entry_ptr]
 #! Outputs: [KEY]
 proc.get_key
-    padw movup.4
-    # => [entry_ptr, pad(4)]
-
-    add.KEY_OFFSET mem_loadw
+    add.KEY_OFFSET
+    padw drop
+    mem_loadw
     # => [KEY]
 end
 
