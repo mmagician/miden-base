@@ -1,19 +1,20 @@
 // AUTH
 // ================================================================================================
-use miden_lib::{account::auth::RpoFalcon512, transaction::TransactionKernel};
+use miden_lib::{account::auth::{RpoFalcon512, RpoFalcon512ProcedureACL}, transaction::TransactionKernel};
 use miden_objects::{
     account::{AccountComponent, AuthSecretKey},
     crypto::dsa::rpo_falcon512::SecretKey,
     testing::account_component::{
         ConditionalAuthComponent, IncrNonceAuthComponent, NoopAuthComponent,
     },
+    Digest,
 };
 use miden_tx::auth::BasicAuthenticator;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
 /// Specifies which authentication mechanism is desired for accounts
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Auth {
     /// Creates a [SecretKey] for the account and creates a [BasicAuthenticator] that gets used
     /// for authenticating the account.
@@ -27,6 +28,10 @@ pub enum Auth {
 
     /// TODO update once #1501 is ready.
     Conditional,
+
+    /// Creates a [SecretKey] for the account with an access control list (ACL) for procedures.
+    /// Only procedures specified in the trigger list require authentication.
+    ProcedureAcl { trigger_procedures: Vec<Digest> },
 }
 
 impl Auth {
@@ -63,6 +68,19 @@ impl Auth {
                 let assembler = TransactionKernel::assembler();
                 let component = ConditionalAuthComponent::new(assembler).unwrap();
                 (component.into(), None)
+            },
+            Auth::ProcedureAcl { trigger_procedures } => {
+                let mut rng = ChaCha20Rng::from_seed(Default::default());
+                let sec_key = SecretKey::with_rng(&mut rng);
+                let pub_key = sec_key.public_key();
+
+                let component = RpoFalcon512ProcedureACL::new(pub_key, trigger_procedures.clone()).into();
+                let authenticator = BasicAuthenticator::<ChaCha20Rng>::new_with_rng(
+                    &[(pub_key.into(), AuthSecretKey::RpoFalcon512(sec_key))],
+                    rng,
+                );
+
+                (component, Some(authenticator))
             },
         }
     }

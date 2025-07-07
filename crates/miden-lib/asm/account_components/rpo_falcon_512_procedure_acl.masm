@@ -24,7 +24,7 @@ const.TRACKED_PROCS_START_SLOT=2
 #!
 #! Inputs:  [pad(16)]
 #! Outputs: [pad(16)]
-export.auth__tx_rpo_falcon512_conditional
+export.auth__tx_rpo_falcon512_procedures_acl
     # Get the number of tracked procedures
     push.NUM_TRACKED_PROCS_SLOT exec.account::get_item
     # => [num_tracked_procs, pad(16)]
