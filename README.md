@@ -1,74 +1,190 @@
-# Miden protocol
+# typos
 
-[![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/miden-base/blob/main/LICENSE)
-[![test](https://github.com/0xMiden/miden-base/actions/workflows/test.yml/badge.svg)](https://github.com/0xMiden/miden-base/actions/workflows/test.yml)
-[![build](https://github.com/0xMiden/miden-base/actions/workflows/build.yml/badge.svg)](https://github.com/0xMiden/miden-base/actions/workflows/build.yml)
-[![RUST_VERSION](https://img.shields.io/badge/rustc-1.87+-lightgray.svg)](https://www.rust-lang.org/tools/install)
-[![GitHub Release](https://img.shields.io/github/release/0xMiden/miden-base)](https://github.com/0xMiden/miden-base/releases/)
+> **Source code spell checker**
 
-Description and core structures for the Miden Rollup protocol.
+Finds and corrects spelling mistakes among source code:
+- Fast enough to run on monorepos
+- Low false positives so you can run on PRs
 
-**WARNING:** This project is in an alpha stage. It has not been audited and may contain bugs and security flaws. This implementation is NOT ready for production use.
+![Screenshot](./docs/screenshot.png)
 
-## Overview
 
-Miden is a zero-knowledge rollup for high-throughput and private applications. Miden allows users to execute and prove transactions locally (i.e., on their devices) and commit only the proofs of the executed transactions to the network.
+[![Downloads](https://img.shields.io/github/downloads/crate-ci/typos/total.svg)](https://github.com/crate-ci/typos/releases)
+[![codecov](https://codecov.io/gh/crate-ci/typos/branch/master/graph/badge.svg)](https://codecov.io/gh/crate-ci/typos)
+[![Documentation](https://img.shields.io/badge/docs-master-blue.svg)][Documentation]
+![License](https://img.shields.io/crates/l/typos.svg)
+[![Crates Status](https://img.shields.io/crates/v/typos.svg)][Crates.io]
 
-If you want to join the technical discussion or learn more about the project, please check out
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE)
 
-* the [Documentation](https://0xMiden.github.io/miden-docs).
-* the [Telegram](https://t.me/BuildOnMiden)
-* the [Repo](https://github.com/0xMiden)
-* the [Roadmap](docs/roadmap.md)
+## Documentation
 
-## Status and features
+- [Installation](#install)
+- [Getting Started](#getting-started)
+  - [False Positives](#false-positives)
+  - [Integrations](#integrations)
+    - [GitHub Action](docs/github-action.md)
+    - [pre-commit](docs/pre-commit.md)
+    - [Custom](#custom)
+  - [Debugging](#debugging)
+- [Reference](docs/reference.md)
+- [FAQ](#faq)
+- [Comparison with other spell checkers](docs/comparison.md)
+- [Projects using typos](https://github.com/crate-ci/typos/wiki)
+- [Benchmarks](benchsuite/runs)
+- [Design](docs/design.md)
+- [Contribute](CONTRIBUTING.md)
+- [CHANGELOG](CHANGELOG.md)
 
-Miden is currently on release v0.10. This is an early version of the protocol and its components. We expect to keep making changes (including breaking changes) to all components.
+## Install
 
-### Feature highlights
+[Download](https://github.com/crate-ci/typos/releases) a pre-built binary
+(installable via [gh-install](https://github.com/crate-ci/gh-install)).
 
-- **Private accounts**. The Miden Operator tracks only commitments to account data in the public database. The users are responsible for keeping track of the state of their accounts.
-- **Public accounts**. With public accounts users are be able to store the entire state of their accounts on-chain, thus, eliminating the need to keep track of account states locally (albeit by sacrificing privacy and at a higher cost).
-- **Private notes**. Like with private accounts, the Miden Operator tracks only commitments to notes in the public database. Users need to communicate note details to each other via side channels.
-- **Public notes**. With public notes, the users are be able to store all note details on-chain, thus, eliminating the need to communicate note details via side-channels.
-- **Local transactions**. Users can execute and prove transactions locally on their devices. The Miden Operator verifies the proofs and if the proofs are valid, updates the state of the rollup accordingly.
-- **Standard account**. Users can create accounts using a small number of standard account interfaces (e.g., basic wallet). In the future, the set of standard smart contracts will be expanded.
-- **Standard notes**. Can create notes using standardized note scripts such as Pay-to-ID (`P2ID`) and atomic swap (`SWAP`). In the future, the set of standardized notes will be expanded.
-- **Delegated note inclusion proofs**. By delegating note inclusion proofs, users can create chains of dependent notes which are included into a block as a single batch.
-- **Transaction recency conditions**. Users are able to specify how close to the chain tip their transactions are to be executed. This enables things like rate limiting and oracles.
-
-### Planned features
-
-- **Network transactions**. Users will be able to create notes intended for network execution. Such notes will be included into transactions executed and proven by the Miden operator.
-- **Encrypted notes**. With encrypted notes users will be able to put all note details on-chain, but the data contained within the notes would be encrypted with the recipient's key.
-
-## Project structure
-
-| Crate                                                          | Description                                                                         |
-|----------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| [objects](crates/miden-objects)                                | Contains core components defining the Miden rollup protocol.                        |
-| [miden-lib](crates/miden-lib)                                  | Contains the code of the Miden rollup kernels and standardized smart contracts.     |
-| [miden-tx](crates/miden-tx)                                    | Contains tool for creating, executing, and proving Miden rollup transaction.        |
-| [bench-tx](bin/bench-tx)                                       | Contains transaction execution and proving benchmarks.                              |
-
-## Make commands
-
-We use `make` to automate building, testing, and other processes. In most cases, `make` commands are just wrappers around `cargo` commands with specific arguments. You can view the list of available commands in the [Makefile](Makefile), or just run the following command:
-
-```shell
-make
+Or use rust to install:
+```console
+$ cargo install typos-cli
 ```
 
-## Testing
-
-To test the crates contained in this repo you can use Make to run the following command present in our [Makefile](Makefile):
-
-```shell
-make test
+Or use [Homebrew](https://brew.sh/) to install:
+```console
+$ brew install typos-cli
 ```
 
-Some of the functions in this project are computationally intensive and may take a significant amount of time to compile and complete during testing. To ensure optimal results we use the `make test` command. It enables the running of tests in release mode and using specific configurations replicates the test conditions of the development mode and verifies all debug assertions.
+Or use [Conda](https://conda.io/) to install:
+```console
+$ conda install typos
+```
 
-## License
+Or use [Pacman](https://wiki.archlinux.org/title/pacman) to install:
+```console
+$ sudo pacman -S typos
+```
 
-This project is [MIT licensed](./LICENSE)
+## Getting Started
+
+Most commonly, you'll either want to see what typos are available with
+```console
+$ typos
+```
+
+Or have them fixed
+```console
+$ typos --write-changes
+$ typos -w
+```
+If there is any ambiguity (multiple possible corrections), `typos` will just report it to the user and move on.
+
+### False Positives
+
+Sometimes, what looks like a typo is intentional, like with people's names, acronyms, or localized content.
+
+To mark a word or an identifier (grouping of words) as valid, add it to your [`_typos.toml`](docs/reference.md) by declaring itself as the valid spelling:
+```toml
+[default]
+extend-ignore-identifiers-re = [
+    # *sigh* this just isn't worth the cost of fixing
+    "AttributeID.*Supress.*",
+]
+
+[default.extend-identifiers]
+# *sigh* this just isn't worth the cost of fixing
+AttributeIDSupressMenu = "AttributeIDSupressMenu"
+
+[default.extend-words]
+# Don't correct the surname "Teh"
+teh = "teh"
+```
+For more ways to ignore or extend the dictionary with examples, see the [config reference](docs/reference.md).
+
+For cases like localized content, you can disable spell checking of file contents while still checking the file name:
+```toml
+[type.po]
+extend-glob = ["*.po"]
+check-file = false
+```
+(run `typos --type-list` to see configured file types)
+
+If you need some more flexibility, you can completely exclude some files from consideration:
+```toml
+[files]
+extend-exclude = ["localized/*.po"]
+```
+
+### Integrations
+
+- [GitHub Actions](docs/github-action.md)
+- [pre-commit](docs/pre-commit.md)
+- [🐊Putout Processor](https://github.com/putoutjs/putout-processor-typos)
+- [Visual Studio Code](https://github.com/tekumara/typos-vscode)
+- [typos-lsp (Language Server Protocol server)](https://github.com/tekumara/typos-vscode)
+
+#### Custom
+
+`typos` provides several building blocks for custom native integrations
+- `-` reads from `stdin`, `--write-changes` will be written to `stdout`
+- `--diff` to provide a diff
+- `--format json` to get jsonlines with exit code 0 on no errors, code 2 on typos, anything else is an error.
+
+Examples:
+```console
+$ # Read file from stdin, write corrected version to stdout
+$ typos - --write-changes
+$ # Creates a diff of what would change
+$ typos dir/file --diff
+$ # Fully programmatic control
+$ typos dir/file --format json
+```
+
+### Debugging
+
+You can see what the effective config looks like by running
+```console
+$ typos --dump-config -
+```
+
+You can then see how typos is processing your project with
+```console
+$ typos --files
+$ typos --identifiers
+$ typos --words
+```
+
+If you need to dig in more, you can enable debug logging with `-v`
+
+## FAQ
+
+### Why was ... not corrected?
+
+**Does the file show up in `typos --files`?**
+If not, check your config with `typos --dump-config -`.
+The `[files]` table controls how we walk files.
+If you are using `files.extend-exclude`,
+are you running into [#593](https://github.com/crate-ci/typos/issues/593)?
+If you are using `files.ignore-vcs = true`,
+is the file in your `.gitignore` but git tracks it anyways?
+Prefer allowing the file explicitly (see [#909](https://github.com/crate-ci/typos/issues/909)).
+
+**Does the identifier show up in `typos --identifiers` or the word show up in `typos --words`?**
+If not, it might be subject to one of typos' heuristics for
+detecting non-words (like hashes) or
+unambiguous words (like words after a `\` escape).
+
+If it is showing up, likely `typos` doesn't know about it yet.
+
+`typos` maintains a list of known typo corrections to keep the false positive
+count low so it can safely run unassisted.
+
+This is in contrast to most spell checking UIs people use where there is a
+known list of valid words.  In this case, the spell checker tries to guess your
+intent by finding the closest-looking word.  It then has a gauge for when a
+word isn't close enough and assumes you know best.  The user has the
+opportunity to verify these corrections and explicitly allow or reject them.
+
+For more on the trade offs of these approaches, see [Design](docs/design.md).
+
+- To correct it locally, see also our [False Positives documentation](#false-positives).
+- To contribute your correction, see [Contribute](CONTRIBUTING.md)
+
+[Crates.io]: https://crates.io/crates/typos-cli
+[Documentation]: https://docs.rs/typos

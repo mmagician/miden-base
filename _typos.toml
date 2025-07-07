@@ -1,0 +1,101 @@
+[default]
+extend-ignore-identifiers-re = [
+    # Ignore identifiers with "2nd" (second)
+    ".*2nd.*",
+    # Ignore specific error constants
+    "ERR_PROLOGUE_NEW_NON_FUNGIBLE_FAUCET_RESERVED_SLOT_MUST_BE_VALID_EMPY_SMT",
+    "ACCOUNT_DELTA_STORGE_MAP_SECTION",
+    # Test variable names
+    "succesful_note_.*",
+]
+
+[default.extend-identifiers]
+# Specific identifiers that should be allowed
+AttributeIDSupressMenu = "AttributeIDSupressMenu"
+countr_one = "countr_one"  # C++ specific
+NDArray = "NDArray"  # Python specific  
+flate2 = "flate2"  # Go stdlib reference
+
+[default.extend-words]
+# Domain-specific terms
+layed = "layed"  # Used consistently in comments about memory layout
+EMPY = "EMPY"  # Used in error constant names
+STORGE = "STORGE"  # Used in constant names
+succesful = "succesful"  # Used in test variable names
+# Changelog entries documenting typo fixes - these are intentional mentions
+contamint = "contamint"
+contamints = "contamints"
+contaminent = "contaminent"
+imlementations = "imlementations"
+includs = "includs"
+qurorum = "qurorum"
+transatctions = "transatctions"
+trasnactions = "trasnactions"
+validasted = "validasted"
+vview = "vview"
+fand = "fand"
+alingment = "alingment"
+grather = "grather"
+adventerous = "adventerous"
+manifestion = "manifestion"
+manifestior = "manifestior"
+donw = "donw"
+usefull = "usefull"
+becuase = "becuase"
+arguement = "arguement"
+Nd = "Nd"  # Man pages
+nd = "nd"  # CSS and variable names
+ot = "ot"  # Shell scripts
+stap = "stap"  # Shell scripts
+existend = "existend"
+erronerous = "erronerous"
+empheral = "empheral"
+grouepd = "grouepd"
+detctable = "detctable"
+seaonal = "seaonal"
+wayferer = "wayferer"
+regylar = "regylar"
+substitutents = "substitutents"
+serialzie = "serialzie"
+decreypted = "decreypted"
+wrappning = "wrappning"
+whaat = "whaat"
+targest = "targest"
+pararmeter = "pararmeter"
+stte = "stte"
+windo = "windo"  # Vim specific
+flate = "flate"  # Go stdlib
+deffer = "deffer"
+opauqe = "opauqe"
+anonimised = "anonimised"
+anonimized = "anonimized"
+identitiy = "identitiy"
+unencyrpted = "unencyrpted"
+signign = "signign"
+requierment = "requierment"
+descrepancy = "descrepancy"
+surrouned = "surrouned"
+instantialed = "instantialed"
+ther = "ther"
+refernce = "refernce"
+# Example typos in documentation
+Supress = "Supress"
+Teh = "Teh"
+teh = "teh"
+typ = "typ"
+# Other technical terms
+entires = "entires"  # May be intentional
+beeen = "beeen"
+appliable = "appliable"
+committment = "committment"
+durning = "durning"
+Frequenty = "Frequenty"
+udpate = "udpate"
+comparion = "comparion"
+
+[files]
+# Don't check typos in the CHANGELOG since it documents historical typo fixes
+extend-exclude = [
+    "doc/CHANGELOG.md",
+    "CHANGELOG.md",
+]
