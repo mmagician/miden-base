@@ -118,8 +118,7 @@ fn test_rpo_falcon_procedure_acl() -> anyhow::Result<()> {
         .tx_script(tx_script_trigger_1.clone())
         .build()?;
 
-    let executed_tx_1 = tx_context_with_auth_1.execute();
-    assert!(executed_tx_1.is_ok(), "Transaction with trigger procedure 1 should succeed");
+    tx_context_with_auth_1.execute().expect("trigger 1 with auth should succeed");
 
     // Test 2: Transaction WITH authenticator calling trigger procedure 2 (should succeed)
     let tx_context_with_auth_2 = mock_chain
@@ -128,8 +127,7 @@ fn test_rpo_falcon_procedure_acl() -> anyhow::Result<()> {
         .tx_script(tx_script_trigger_2)
         .build()?;
 
-    let executed_tx_2 = tx_context_with_auth_2.execute();
-    assert!(executed_tx_2.is_ok(), "Transaction with trigger procedure 2 should succeed");
+    tx_context_with_auth_2.execute().expect("trigger 2 with auth should succeed");
 
     // Test 3: Transaction WITHOUT authenticator calling trigger procedure (should fail)
     let tx_context_no_auth = mock_chain
@@ -167,12 +165,7 @@ fn test_rpo_falcon_procedure_acl() -> anyhow::Result<()> {
         .tx_script(tx_script_no_trigger)
         .build()?;
 
-    let executed_tx_no_trigger = tx_context_no_trigger.execute();
-    assert!(
-        executed_tx_no_trigger.is_ok(),
-        "Transaction with non-trigger procedure should succeed without authenticator, got: {:?}",
-        executed_tx_no_trigger.unwrap_err()
-    );
+    tx_context_no_trigger.execute().expect("no trigger, no auth should succeed");
 
     Ok(())
 }
