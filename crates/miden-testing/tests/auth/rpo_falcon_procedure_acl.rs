@@ -1,3 +1,4 @@
+use assert_matches::assert_matches;
 use miden_lib::transaction::{TransactionKernel, TransactionKernelError};
 use miden_objects::{
     account::{
@@ -138,25 +139,19 @@ fn test_rpo_falcon_procedure_acl() -> anyhow::Result<()> {
 
     let executed_tx_no_auth = tx_context_no_auth.execute();
 
-    match executed_tx_no_auth {
-        Err(TransactionExecutorError::TransactionProgramExecutionFailed(execution_error)) => {
-            match execution_error {
-                ExecutionError::EventError { error, .. } => {
-                    match error.downcast_ref::<TransactionKernelError>() {
-                        Some(TransactionKernelError::FailedSignatureGeneration(msg)) => {
-                            assert_eq!(
-                                *msg, "No authenticator assigned to transaction host",
-                                "Expected 'No authenticator assigned to transaction host' error, got: {msg}"
-                            );
-                        },
-                        _ => panic!("Expected FailedSignatureGeneration error, got: {error:?}"),
-                    }
-                },
-                _ => panic!("Expected EventError, got: {execution_error:?}"),
-            }
-        },
-        _ => panic!("Expected transaction to fail with TransactionProgramExecutionFailed error"),
-    }
+    assert_matches!(executed_tx_no_auth, Err(TransactionExecutorError::TransactionProgramExecutionFailed(
+        execution_error
+    )) => {
+        assert_matches!(execution_error, ExecutionError::EventError { error, .. } => {
+            let kernel_error = error.downcast_ref::<TransactionKernelError>().unwrap();
+            assert_matches!(kernel_error, TransactionKernelError::FailedSignatureGeneration(msg) => {
+                assert_eq!(
+                    *msg, "No authenticator assigned to transaction host",
+                    "Expected 'No authenticator assigned to transaction host' error, got: {msg}"
+                );
+            })
+        })
+    });
 
     // Test 4: Transaction WITHOUT authenticator calling non-trigger procedure (should succeed)
     let tx_context_no_trigger = mock_chain
