@@ -97,13 +97,11 @@ async fn update_ger_note_updates_storage() -> anyhow::Result<()> {
     let mut updated_bridge_account = bridge_account.clone();
     updated_bridge_account.apply_delta(executed_transaction.account_delta())?;
 
-    let is_registered =
-        AggLayerBridge::is_ger_registered(ger, updated_bridge_account.clone())?;
+    let is_registered = AggLayerBridge::is_ger_registered(ger, updated_bridge_account.clone())?;
     assert!(is_registered, "GER was not registered in the bridge account");
 
     // Verify the stored block number matches the transaction's reference block
-    let block_num =
-        AggLayerBridge::get_ger_block_number(ger, updated_bridge_account)?.unwrap();
+    let block_num = AggLayerBridge::get_ger_block_number(ger, updated_bridge_account)?.unwrap();
     assert_eq!(
         block_num,
         mock_chain.latest_block_header().block_num(),

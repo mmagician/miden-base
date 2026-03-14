@@ -3,9 +3,10 @@ extern crate alloc;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use miden_core::{Felt, FieldElement, ONE, Word, ZERO};
+use miden_core::{Felt, FieldElement, ONE, Word};
 use miden_protocol::account::component::AccountComponentMetadata;
 use miden_protocol::account::{Account, AccountComponent, AccountId, StorageSlot, StorageSlotName};
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_utils_sync::LazyLock;
 use thiserror::Error;
@@ -102,7 +103,8 @@ impl AggLayerBridge {
     // CONSTANTS
     // --------------------------------------------------------------------------------------------
 
-    const REGISTERED_GER_MAP_VALUE: Word = Word::new([ONE, ZERO, ZERO, ZERO]);
+    /// Index of the GER-known flag within the stored GER map value word.
+    const GER_FLAG_INDEX: usize = 0;
 
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
@@ -158,6 +160,10 @@ impl AggLayerBridge {
     /// Returns a boolean indicating whether the provided GER is present in storage of the provided
     /// bridge account.
     ///
+    /// The GER map stores `[GER_KNOWN_FLAG, block_num, 0, 0]` for registered GERs, where
+    /// `block_num` is the reference block number at registration time. This method checks only
+    /// the flag element.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
@@ -166,8 +172,32 @@ impl AggLayerBridge {
         ger: ExitRoot,
         bridge_account: Account,
     ) -> Result<bool, AgglayerBridgeError> {
-        // check that the provided account is a bridge account
-        Self::assert_bridge_account(&bridge_account)?;
+        let stored_value = Self::get_ger_value(ger, &bridge_account)?;
+        Ok(stored_value[Self::GER_FLAG_INDEX] == ONE)
+    }
+
+    /// Returns the block number at which the provided GER was registered, or `None` if the GER
+    /// is not registered.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - the provided account is not an [`AggLayerBridge`] account.
+    pub fn get_ger_block_number(
+        ger: ExitRoot,
+        bridge_account: Account,
+    ) -> Result<Option<BlockNumber>, AgglayerBridgeError> {
+        let stored_value = Self::get_ger_value(ger, &bridge_account)?;
+        if stored_value[Self::GER_FLAG_INDEX] != ONE {
+            return Ok(None);
+        }
+        let block_num = stored_value[1].as_int() as u32;
+        Ok(Some(BlockNumber::from(block_num)))
+    }
+
+    /// Looks up the raw value stored for the given GER in the bridge account's GER map.
+    fn get_ger_value(ger: ExitRoot, bridge_account: &Account) -> Result<Word, AgglayerBridgeError> {
+        Self::assert_bridge_account(bridge_account)?;
 
         // Compute the expected GER hash: rpo256::merge(GER_UPPER, GER_LOWER)
         let mut ger_lower: [Felt; 4] = ger.to_elements()[0..4].try_into().unwrap();
@@ -182,18 +212,12 @@ impl AggLayerBridge {
         ger_upper.reverse();
         let ger_hash = Rpo256::merge(&[ger_upper.into(), ger_lower.into()]);
 
-        // Get the value stored by the GER hash. If this GER was registered, the value would be
-        // equal to [1, 0, 0, 0]
         let stored_value = bridge_account
             .storage()
             .get_map_item(AggLayerBridge::ger_map_slot_name(), ger_hash)
             .expect("provided account should have AggLayer Bridge specific storage slots");
 
-        if stored_value == Self::REGISTERED_GER_MAP_VALUE {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        Ok(stored_value)
     }
 
     /// Reads the Local Exit Root (double-word) from the bridge account's storage.
