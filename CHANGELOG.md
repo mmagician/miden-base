@@ -2,6 +2,9 @@
 
 ## v0.15.0 (TBD)
 
+### Features
+- Added emergency pause mechanism for the AggLayer bridge, allowing the bridge admin to pause and unpause bridge operations via `EmergencyPauseNote` ([#15](https://github.com/mmagician/miden-base/pull/15)).
+
 ### Changes
 - Added validation of leaf type on CLAIM note processing to prevent message leaves from being processed as asset claims ([#2730](https://github.com/0xMiden/protocol/pull/2730)).
 
